@@ -1,8 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Users, Target, Heart } from "lucide-react";
 import heroImage from "@/assets/hero-community.jpg";
+import { useNavigate } from "react-router-dom";
 
 const HeroSection = () => {
+  const navigate = useNavigate();
   const stats = [
     { icon: Users, label: "Organizations Helped", value: "150+" },
     { icon: Target, label: "Campaigns Active", value: "89" },
@@ -36,11 +38,21 @@ const HeroSection = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-12">
-              <Button variant="hero" size="xl" className="group">
+              <Button
+                variant="hero"
+                size="xl"
+                className="group"
+                onClick={() => navigate("/campaigns")}
+              >
                 Start Giving Today
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Button>
-              <Button variant="outline" size="xl" className="bg-white/10 border-white/30 text-white hover:bg-white/20">
+              <Button
+                variant="outline"
+                size="xl"
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+                onClick={() => navigate("/organizations")}
+              >
                 Browse Organizations
               </Button>
             </div>
@@ -78,7 +90,9 @@ const HeroSection = () => {
                 <div className="w-full bg-white/20 rounded-full h-2">
                   <div className="bg-success h-2 rounded-full w-1/2"></div>
                 </div>
-                <Button variant="impact" className="w-full mt-6">
+                <Button variant="impact" className="w-full mt-6"
+                  onClick={() => navigate("/campaigns")}
+                >
                   Join These Causes
                 </Button>
               </div>

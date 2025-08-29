@@ -15,9 +15,11 @@ import {
   Heart,
   TrendingUp
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import campaignImage from "@/assets/food-donations.jpg";
 
 const Campaigns = () => {
+  const navigate = useNavigate();
   const campaigns = [
     {
       id: 1,
@@ -166,7 +168,11 @@ const Campaigns = () => {
 
           <div className="grid lg:grid-cols-2 gap-8 mb-16">
             {campaigns.filter(c => c.featured).map((campaign) => (
-              <Card key={campaign.id} className="group overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+              <Card
+                key={campaign.id}
+                className="group overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
+                onClick={() => navigate(`/campaigns/${campaign.id}`)}
+              >
                 <div className="relative">
                   <img
                     src={campaign.image}
@@ -229,10 +235,26 @@ const Campaigns = () => {
                   </div>
 
                   <div className="flex gap-3">
-                    <Button variant="default" size="sm" className="flex-1">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/campaigns/${campaign.id}`);
+                      }}
+                    >
                       Learn More
                     </Button>
-                    <Button variant="donate" size="sm" className="flex-1">
+                    <Button
+                      variant="donate"
+                      size="sm"
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/donate`);
+                      }}
+                    >
                       <Heart className="w-4 h-4 mr-1" />
                       Donate Now
                     </Button>
@@ -258,7 +280,11 @@ const Campaigns = () => {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {campaigns.map((campaign) => (
-              <Card key={campaign.id} className="group overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer">
+              <Card
+                key={campaign.id}
+                className="group overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer"
+                onClick={() => navigate(`/campaigns/${campaign.id}`)}
+              >
                 <div className="relative">
                   <img
                     src={campaign.image}

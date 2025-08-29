@@ -6,6 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Heart, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 const Auth = () => {
   const [userType, setUserType] = useState("");
@@ -40,10 +42,38 @@ const Auth = () => {
               <Button className="w-full" variant="default">
                 Sign In
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full flex items-center justify-center gap-2"
+                onClick={async () => {
+                  const { error } = await supabase.auth.signInWithOAuth({
+                    provider: "google",
+                    options: {
+                      redirectTo: window.location.origin,
+                    },
+                  });
+                  if (error) {
+                    toast({
+                      title: "Google sign-in failed",
+                      description: error.message,
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="w-5 h-5">
+                  <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.599 32.438 29.195 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.158 7.961 3.039l5.657-5.657C34.869 6.053 29.73 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20c10.493 0 19-8.507 19-19 0-1.262-.131-2.496-.389-3.917z"/>
+                  <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.267 16.108 18.799 12 24 12c3.059 0 5.842 1.158 7.961 3.039l5.657-5.657C34.869 6.053 29.73 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+                  <path fill="#4CAF50" d="M24 44c5.138 0 9.801-1.977 13.285-5.193l-6.142-5.2C29.11 35.091 26.671 36 24 36c-5.176 0-9.568-3.539-11.192-8.333l-6.5 5.02C9.62 39.556 16.227 44 24 44z"/>
+                  <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-1.087 3.129-3.368 5.583-6.16 7.027l.001-.001 6.142 5.2C33.036 41.205 38 37 38 25c0-1.262-.131-2.496-.389-3.917z"/>
+                </svg>
+                Continue with Google
+              </Button>
               <div className="text-center text-sm">
-                <a href="#" className="text-primary hover:underline">
+                <Link to="/forgot-password" className="text-primary hover:underline">
                   Forgot your password?
-                </a>
+                </Link>
               </div>
             </TabsContent>
             

@@ -3,40 +3,11 @@ import Footer from "@/components/Footer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Heart, Users, Calendar } from "lucide-react";
+import { stories } from "@/lib/stories";
+import { Link } from "react-router-dom";
 
 const Stories = () => {
-  const stories = [
-    {
-      id: 1,
-      title: "Rebuilding Lives After Typhoon Aftermath",
-      organization: "Manila Relief Foundation",
-      category: "Disaster Relief",
-      impact: "500 families helped",
-      date: "November 2024",
-      excerpt: "Through community donations, we were able to provide emergency shelter and supplies to families affected by the recent typhoon, helping them rebuild their lives.",
-      image: "/placeholder.svg"
-    },
-    {
-      id: 2,
-      title: "Feeding Program Reaches Rural Communities",
-      organization: "Nutrition First PH",
-      category: "Food Security",
-      impact: "2,000 children fed daily",
-      date: "October 2024",
-      excerpt: "Our school feeding program has expanded to reach remote villages, ensuring no child goes to school hungry. The impact on learning outcomes has been remarkable.",
-      image: "/placeholder.svg"
-    },
-    {
-      id: 3,
-      title: "Clean Water Access for Island Communities",
-      organization: "Water for All Initiative",
-      category: "Water & Sanitation",
-      impact: "15 communities served",
-      date: "September 2024",
-      excerpt: "Installing water filtration systems in remote island communities has dramatically reduced waterborne illnesses and improved quality of life for thousands.",
-      image: "/placeholder.svg"
-    }
-  ];
+  // Using shared stories from src/lib/stories
 
   return (
     <div className="min-h-screen bg-background">
@@ -96,9 +67,9 @@ const Stories = () => {
                             <Users className="w-5 h-5 mr-2" />
                             <span className="font-semibold">{story.impact}</span>
                           </div>
-                          <button className="text-primary hover:text-primary-dark font-semibold">
+                          <Link to={`/stories/${story.slug}`} className="text-primary hover:text-primary-dark font-semibold">
                             Read Full Story →
-                          </button>
+                          </Link>
                         </div>
                       </div>
                     </div>

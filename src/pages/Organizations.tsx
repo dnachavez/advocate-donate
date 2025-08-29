@@ -14,9 +14,11 @@ import {
   Grid3X3,
   List
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import organizationImage from "@/assets/organization-relief.jpg";
 
 const Organizations = () => {
+  const navigate = useNavigate();
   const organizations = [
     {
       id: 1,
@@ -171,7 +173,11 @@ const Organizations = () => {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {organizations.map((org) => (
-              <Card key={org.id} className="group overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-card cursor-pointer">
+              <Card
+                key={org.id}
+                className="group overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-card cursor-pointer"
+                onClick={() => navigate(`/organizations/${org.slug}`)}
+              >
                 {/* Organization Image */}
                 <div className="relative h-48 overflow-hidden">
                   <img
@@ -240,10 +246,26 @@ const Organizations = () => {
 
                   {/* Actions */}
                   <div className="flex gap-2">
-                    <Button variant="default" size="sm" className="flex-1">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/organizations/${org.slug}`);
+                      }}
+                    >
                       View Details
                     </Button>
-                    <Button variant="donate" size="sm" className="flex-1">
+                    <Button
+                      variant="donate"
+                      size="sm"
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/donate`);
+                      }}
+                    >
                       Donate Now
                     </Button>
                   </div>

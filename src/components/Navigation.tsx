@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Heart, Search, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Link } from "react-router-dom";
 
 const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -43,12 +44,14 @@ const Navigation = () => {
             <Button variant="ghost" size="icon">
               <Search className="w-4 h-4" />
             </Button>
-            <Button variant="outline" size="sm">
-              <User className="w-4 h-4" />
-              Sign In
+            <Button asChild variant="outline" size="sm">
+              <Link to="/auth">
+                <User className="w-4 h-4" />
+                Sign In
+              </Link>
             </Button>
-            <Button variant="donate" size="sm">
-              Donate Now
+            <Button asChild variant="donate" size="sm">
+              <Link to="/donate">Donate Now</Link>
             </Button>
           </div>
 
@@ -83,12 +86,16 @@ const Navigation = () => {
               </a>
             ))}
             <div className="flex flex-col space-y-3 pt-4 border-t border-border">
-              <Button variant="outline" size="sm">
-                <User className="w-4 h-4" />
-                Sign In
+              <Button asChild variant="outline" size="sm">
+                <Link to="/auth" onClick={() => setIsMenuOpen(false)}>
+                  <User className="w-4 h-4" />
+                  Sign In
+                </Link>
               </Button>
-              <Button variant="donate" size="sm">
-                Donate Now
+              <Button asChild variant="donate" size="sm">
+                <Link to="/donate" onClick={() => setIsMenuOpen(false)}>
+                  Donate Now
+                </Link>
               </Button>
             </div>
           </div>

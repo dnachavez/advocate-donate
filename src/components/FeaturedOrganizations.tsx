@@ -2,13 +2,16 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Users, Target, Verified } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
 import organizationImage from "@/assets/organization-relief.jpg";
 
 const FeaturedOrganizations = () => {
+  const navigate = useNavigate();
   const organizations = [
     {
       id: 1,
       name: "Hope Community Center",
+      slug: "hope-community-center",
       location: "Manila, Philippines",
       description: "Providing food security and shelter support for families in need across Metro Manila.",
       verified: true,
@@ -22,6 +25,7 @@ const FeaturedOrganizations = () => {
     {
       id: 2,
       name: "Shelter First Foundation",
+      slug: "shelter-first-foundation",
       location: "Cebu City, Philippines",
       description: "Building safe homes and providing temporary shelter for disaster-affected families.",
       verified: true,
@@ -35,6 +39,7 @@ const FeaturedOrganizations = () => {
     {
       id: 3,
       name: "Education Bridge PH",
+      slug: "education-bridge-ph",
       location: "Davao City, Philippines",
       description: "Ensuring every child has access to quality education and learning materials.",
       verified: true,
@@ -67,7 +72,11 @@ const FeaturedOrganizations = () => {
         {/* Organizations Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
           {organizations.map((org) => (
-            <Card key={org.id} className="group overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-card">
+            <Card
+              key={org.id}
+              className="group overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-card cursor-pointer"
+              onClick={() => navigate(`/organizations/${org.slug}`)}
+            >
               {/* Organization Image */}
               <div className="relative h-48 overflow-hidden">
                 <img
@@ -125,10 +134,26 @@ const FeaturedOrganizations = () => {
 
                 {/* Actions */}
                 <div className="flex gap-2">
-                  <Button variant="default" size="sm" className="flex-1">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="flex-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/organizations/${org.slug}`);
+                    }}
+                  >
                     View Details
                   </Button>
-                  <Button variant="donate" size="sm" className="flex-1">
+                  <Button
+                    variant="donate"
+                    size="sm"
+                    className="flex-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/donate`);
+                    }}
+                  >
                     Donate Now
                   </Button>
                 </div>
@@ -139,10 +164,12 @@ const FeaturedOrganizations = () => {
 
         {/* View All Button */}
         <div className="text-center">
-          <Button variant="outline" size="lg">
-            View All Organizations
-            <Users className="w-4 h-4 ml-2" />
-          </Button>
+          <Link to="/organizations">
+            <Button variant="outline" size="lg">
+              View All Organizations
+              <Users className="w-4 h-4 ml-2" />
+            </Button>
+          </Link>
         </div>
       </div>
     </section>

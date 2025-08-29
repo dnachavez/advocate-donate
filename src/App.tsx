@@ -19,6 +19,19 @@ import Support from "./pages/Support";
 import Safety from "./pages/Safety";
 import Guidelines from "./pages/Guidelines";
 import NotFound from "./pages/NotFound";
+import OrganizationDetail from "./pages/OrganizationDetail";
+import CampaignDetail from "./pages/CampaignDetail";
+import Careers from "./pages/Careers";
+import Press from "./pages/Press";
+import Contact from "./pages/Contact";
+import Api from "./pages/Api";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
+import Cookies from "./pages/Cookies";
+import StoryDetail from "./pages/StoryDetail";
+import ForgotPassword from "./pages/ForgotPassword";
+import DonateOrganization from "./pages/DonateOrganization";
+import DonateCampaign from "./pages/DonateCampaign";
 
 const queryClient = new QueryClient();
 
@@ -31,12 +44,17 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/organizations" element={<Organizations />} />
+          <Route path="/organizations/:slug" element={<OrganizationDetail />} />
+          <Route path="/organizations/:slug/donate" element={<DonateOrganization />} />
           <Route path="/campaigns" element={<Campaigns />} />
+          <Route path="/campaigns/:id" element={<CampaignDetail />} />
+          <Route path="/campaigns/:id/donate" element={<DonateCampaign />} />
           <Route path="/about" element={<About />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/donate" element={<Donate />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="/stories" element={<Stories />} />
+          <Route path="/stories/:slug" element={<StoryDetail />} />
           <Route path="/tax-info" element={<TaxInfo />} />
           <Route path="/verify" element={<Verify />} />
           <Route path="/create-campaign" element={<CreateCampaign />} />
@@ -44,6 +62,14 @@ const App = () => (
           <Route path="/support" element={<Support />} />
           <Route path="/safety" element={<Safety />} />
           <Route path="/guidelines" element={<Guidelines />} />
+          <Route path="/careers" element={<Careers />} />
+          <Route path="/press" element={<Press />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/api" element={<Api />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/cookies" element={<Cookies />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
@@ -53,3 +79,6 @@ const App = () => (
 );
 
 export default App;
+
+
+

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Heart, Search, Filter, MapPin, Calendar, Target } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Donate = () => {
   const [selectedAmount, setSelectedAmount] = useState("");
@@ -276,9 +277,9 @@ const Donate = () => {
                       </div>
                     </div>
                     
-                    <Button className="w-full" variant="default">
-                      Donate Now
-                    </Button>
+                    <Link to={`/campaigns/${campaign.id}/donate`} className="block">
+                      <Button className="w-full" variant="default">Donate Now</Button>
+                    </Link>
                   </CardContent>
                 </Card>
               ))}
