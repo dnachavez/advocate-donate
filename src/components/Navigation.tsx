@@ -1,11 +1,21 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Heart, Search, User } from "lucide-react";
+import { Menu, X, Heart, Search, User, LogOut, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, isAuthenticated, signOut, loading } = useAuth();
 
   const navItems = [
     { label: "Organizations", href: "/organizations" },
@@ -44,15 +54,70 @@ const Navigation = () => {
             <Button variant="ghost" size="icon">
               <Search className="w-4 h-4" />
             </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/auth">
-                <User className="w-4 h-4" />
-                Sign In
-              </Link>
-            </Button>
-            <Button asChild variant="donate" size="sm">
-              <Link to="/donate">Donate Now</Link>
-            </Button>
+            
+            {loading ? (
+              <div className="w-8 h-8 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
+            ) : isAuthenticated ? (
+              <>
+                <Button asChild variant="donate" size="sm">
+                  <Link to="/donate">Donate Now</Link>
+                </Button>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      {user?.user_metadata?.fullName || user?.email?.split('@')[0] || 'User'}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium">
+                          {user?.user_metadata?.fullName || 'User'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {user?.email}
+                        </p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link to="/dashboard" className="flex items-center gap-2">
+                        <User className="w-4 h-4" />
+                        Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/create-campaign" className="flex items-center gap-2">
+                        <Heart className="w-4 h-4" />
+                        Create Campaign
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={signOut}
+                      className="flex items-center gap-2 text-red-600 focus:text-red-600"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            ) : (
+              <>
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/auth">
+                    <User className="w-4 h-4" />
+                    Sign In
+                  </Link>
+                </Button>
+                <Button asChild variant="donate" size="sm">
+                  <Link to="/donate">Donate Now</Link>
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -86,17 +151,65 @@ const Navigation = () => {
               </a>
             ))}
             <div className="flex flex-col space-y-3 pt-4 border-t border-border">
-              <Button asChild variant="outline" size="sm">
-                <Link to="/auth" onClick={() => setIsMenuOpen(false)}>
-                  <User className="w-4 h-4" />
-                  Sign In
-                </Link>
-              </Button>
-              <Button asChild variant="donate" size="sm">
-                <Link to="/donate" onClick={() => setIsMenuOpen(false)}>
-                  Donate Now
-                </Link>
-              </Button>
+              {loading ? (
+                <div className="flex justify-center py-4">
+                  <div className="w-6 h-6 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
+                </div>
+              ) : isAuthenticated ? (
+                <>
+                  <div className="px-2 py-1">
+                    <p className="text-sm font-medium">
+                      {user?.user_metadata?.fullName || 'User'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {user?.email}
+                    </p>
+                  </div>
+                  <Button asChild variant="outline" size="sm">
+                    <Link to="/dashboard" onClick={() => setIsMenuOpen(false)}>
+                      <User className="w-4 h-4" />
+                      Dashboard
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link to="/create-campaign" onClick={() => setIsMenuOpen(false)}>
+                      <Heart className="w-4 h-4" />
+                      Create Campaign
+                    </Link>
+                  </Button>
+                  <Button asChild variant="donate" size="sm">
+                    <Link to="/donate" onClick={() => setIsMenuOpen(false)}>
+                      Donate Now
+                    </Link>
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    onClick={() => {
+                      signOut();
+                      setIsMenuOpen(false);
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button asChild variant="outline" size="sm">
+                    <Link to="/auth" onClick={() => setIsMenuOpen(false)}>
+                      <User className="w-4 h-4" />
+                      Sign In
+                    </Link>
+                  </Button>
+                  <Button asChild variant="donate" size="sm">
+                    <Link to="/donate" onClick={() => setIsMenuOpen(false)}>
+                      Donate Now
+                    </Link>
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -3,6 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { RequireAuth, RequireVerification, PublicRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import Organizations from "./pages/Organizations";
 import Campaigns from "./pages/Campaigns";
@@ -30,18 +32,22 @@ import Terms from "./pages/Terms";
 import Cookies from "./pages/Cookies";
 import StoryDetail from "./pages/StoryDetail";
 import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import EmailVerification from "./pages/EmailVerification";
 import DonateOrganization from "./pages/DonateOrganization";
 import DonateCampaign from "./pages/DonateCampaign";
+import Dashboard from "./pages/Dashboard";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
+      <AuthProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/organizations" element={<Organizations />} />
           <Route path="/organizations/:slug" element={<OrganizationDetail />} />
@@ -50,14 +56,35 @@ const App = () => (
           <Route path="/campaigns/:id" element={<CampaignDetail />} />
           <Route path="/campaigns/:id/donate" element={<DonateCampaign />} />
           <Route path="/about" element={<About />} />
-          <Route path="/auth" element={<Auth />} />
+          <Route path="/auth" element={
+             <PublicRoute>
+               <Auth />
+             </PublicRoute>
+           } />
+           <Route path="/dashboard" element={
+             <RequireAuth>
+               <Dashboard />
+             </RequireAuth>
+           } />
           <Route path="/donate" element={<Donate />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="/stories" element={<Stories />} />
           <Route path="/stories/:slug" element={<StoryDetail />} />
           <Route path="/tax-info" element={<TaxInfo />} />
-          <Route path="/verify" element={<Verify />} />
-          <Route path="/create-campaign" element={<CreateCampaign />} />
+          <Route path="/verify" element={
+            <RequireAuth>
+              <RequireVerification>
+                <Verify />
+              </RequireVerification>
+            </RequireAuth>
+          } />
+          <Route path="/create-campaign" element={
+            <RequireAuth>
+              <RequireVerification>
+                <CreateCampaign />
+              </RequireVerification>
+            </RequireAuth>
+          } />
           <Route path="/resources" element={<Resources />} />
           <Route path="/support" element={<Support />} />
           <Route path="/safety" element={<Safety />} />
@@ -70,10 +97,13 @@ const App = () => (
           <Route path="/terms" element={<Terms />} />
           <Route path="/cookies" element={<Cookies />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/verify-email" element={<EmailVerification />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

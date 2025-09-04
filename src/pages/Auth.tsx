@@ -1,17 +1,322 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Heart, ArrowLeft } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Heart, ArrowLeft, Eye, EyeOff, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { 
+  signUp, 
+  signIn, 
+  validateEmail, 
+  validatePassword, 
+  validatePasswordConfirmation,
+  sanitizeInput,
+  generateCSRFToken,
+  checkRateLimit
+} from "@/lib/auth";
+import { PasswordStrength } from "@/components/ui/password-strength";
+import { cn } from "@/lib/utils";
+
+// Form interfaces
+interface SignInForm {
+  email: string;
+  password: string;
+}
+
+interface SignUpForm {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  fullName: string;
+  phoneNumber: string;
+  userType: string;
+  organizationName?: string;
+  registrationNumber?: string;
+  website?: string;
+  companyName?: string;
+  businessRegistration?: string;
+}
 
 const Auth = () => {
-  const [userType, setUserType] = useState("");
-
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const mode = searchParams.get('mode');
+  
+  // State management
+  const [activeTab, setActiveTab] = useState(mode === 'reset' ? 'signin' : 'signin');
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [csrfToken, setCsrfToken] = useState('');
+  
+  // Form states
+  const [signInForm, setSignInForm] = useState<SignInForm>({
+    email: '',
+    password: ''
+  });
+  
+  const [signUpForm, setSignUpForm] = useState<SignUpForm>({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    fullName: '',
+    phoneNumber: '',
+    userType: ''
+  });
+  
+  // Validation states
+  const [signInErrors, setSignInErrors] = useState<Partial<SignInForm>>({});
+  const [signUpErrors, setSignUpErrors] = useState<Partial<SignUpForm>>({});
+  const [generalError, setGeneralError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  
+  // Initialize CSRF token
+  useEffect(() => {
+    setCsrfToken(generateCSRFToken());
+  }, []);
+  
+  // Handle authentication state changes
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        toast({
+          title: 'Welcome back!',
+          description: 'You have been successfully signed in.',
+        });
+        navigate('/');
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+  
+  // Validate sign-in form
+  const validateSignInForm = (): boolean => {
+    const errors: Partial<SignInForm> = {};
+    
+    const emailValidation = validateEmail(signInForm.email);
+    if (!emailValidation.isValid) {
+      errors.email = emailValidation.error;
+    }
+    
+    if (!signInForm.password) {
+      errors.password = 'Password is required';
+    }
+    
+    setSignInErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+  
+  // Validate sign-up form
+  const validateSignUpForm = (): boolean => {
+    const errors: Partial<SignUpForm> = {};
+    
+    // Email validation
+    const emailValidation = validateEmail(signUpForm.email);
+    if (!emailValidation.isValid) {
+      errors.email = emailValidation.error;
+    }
+    
+    // Password validation
+    const passwordValidation = validatePassword(signUpForm.password);
+    if (!passwordValidation.isValid) {
+      errors.password = passwordValidation.errors[0];
+    }
+    
+    // Confirm password validation
+    const confirmPasswordValidation = validatePasswordConfirmation(
+      signUpForm.password, 
+      signUpForm.confirmPassword
+    );
+    if (!confirmPasswordValidation.isValid) {
+      errors.confirmPassword = confirmPasswordValidation.error;
+    }
+    
+    // Required fields
+    if (!signUpForm.fullName.trim()) {
+      errors.fullName = 'Full name is required';
+    }
+    
+    if (!signUpForm.userType) {
+      errors.userType = 'Please select a user type';
+    }
+    
+    // Conditional validations
+    if (signUpForm.userType === 'nonprofit') {
+      if (!signUpForm.organizationName?.trim()) {
+        errors.organizationName = 'Organization name is required';
+      }
+      if (!signUpForm.registrationNumber?.trim()) {
+        errors.registrationNumber = 'Registration number is required';
+      }
+    }
+    
+    if (signUpForm.userType === 'business') {
+      if (!signUpForm.companyName?.trim()) {
+        errors.companyName = 'Company name is required';
+      }
+      if (!signUpForm.businessRegistration?.trim()) {
+        errors.businessRegistration = 'Business registration is required';
+      }
+    }
+    
+    setSignUpErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+  
+  // Handle sign-in
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setGeneralError('');
+    
+    if (!validateSignInForm()) {
+      return;
+    }
+    
+    // Check rate limiting
+    const rateLimitCheck = checkRateLimit(signInForm.email);
+    if (!rateLimitCheck.allowed) {
+      const blockedUntil = rateLimitCheck.blockedUntil;
+      setGeneralError(
+        `Too many failed attempts. Please try again ${blockedUntil ? `after ${blockedUntil.toLocaleTimeString()}` : 'later'}`
+      );
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      const { data, error } = await signIn(
+        sanitizeInput(signInForm.email),
+        signInForm.password
+      );
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data?.user) {
+        toast({
+          title: 'Success!',
+          description: 'You have been successfully signed in.',
+        });
+        navigate('/');
+      }
+    } catch (error) {
+      console.error('Sign in error:', error);
+      setGeneralError(
+        error instanceof Error ? error.message : 'An unexpected error occurred'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Handle sign-up
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setGeneralError('');
+    setSuccessMessage('');
+    
+    if (!validateSignUpForm()) {
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      const additionalData: Record<string, string | number | boolean> = {
+        phone_number: sanitizeInput(signUpForm.phoneNumber),
+      };
+      
+      if (signUpForm.userType === 'nonprofit') {
+        additionalData.organization_name = sanitizeInput(signUpForm.organizationName || '');
+        additionalData.registration_number = sanitizeInput(signUpForm.registrationNumber || '');
+        if (signUpForm.website) {
+          additionalData.website = sanitizeInput(signUpForm.website);
+        }
+      }
+      
+      if (signUpForm.userType === 'business') {
+        additionalData.company_name = sanitizeInput(signUpForm.companyName || '');
+        additionalData.business_registration = sanitizeInput(signUpForm.businessRegistration || '');
+        if (signUpForm.website) {
+          additionalData.website = sanitizeInput(signUpForm.website);
+        }
+      }
+      
+      const { data, error } = await signUp({
+        email: sanitizeInput(signUpForm.email),
+        password: signUpForm.password,
+        fullName: sanitizeInput(signUpForm.fullName),
+        userType: signUpForm.userType,
+        additionalData
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data?.user) {
+        setSuccessMessage(
+          'Account created successfully! We\'ve sent a verification email to your inbox. Please check your email and click the verification link to activate your account.'
+        );
+        
+        // Reset form
+        setSignUpForm({
+          email: '',
+          password: '',
+          confirmPassword: '',
+          fullName: '',
+          phoneNumber: '',
+          userType: ''
+        });
+        
+        // Don't auto-switch tabs, let user verify email first
+        toast({
+          title: 'Check your email',
+          description: 'We\'ve sent you a verification link. Please verify your email before signing in.',
+          duration: 5000,
+        });
+      }
+    } catch (error) {
+      console.error('Sign up error:', error);
+      setGeneralError(
+        error instanceof Error ? error.message : 'An unexpected error occurred'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Handle Google OAuth
+  const handleGoogleSignIn = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/`,
+        },
+      });
+      
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      toast({
+        title: 'Google sign-in failed',
+        description: error instanceof Error ? error.message : 'Please try again later.',
+        variant: 'destructive',
+      });
+    }
+  };
+  
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
@@ -28,39 +333,115 @@ const Auth = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="signin" className="space-y-4">
+          {/* General Messages */}
+          {generalError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{generalError}</AlertDescription>
+            </Alert>
+          )}
+          
+          {successMessage && (
+            <Alert className="mb-4 border-green-200 bg-green-50">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">{successMessage}</AlertDescription>
+            </Alert>
+          )}
+          
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
             </TabsList>
             
+            {/* Sign In Tab */}
             <TabsContent value="signin" className="space-y-4">
-              <div className="space-y-2">
-                <Input placeholder="Email address" type="email" />
-                <Input placeholder="Password" type="password" />
+              <form onSubmit={handleSignIn} className="space-y-4">
+                <input type="hidden" name="csrf_token" value={csrfToken} />
+                
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Email address"
+                    type="email"
+                    value={signInForm.email}
+                    onChange={(e) => {
+                      setSignInForm(prev => ({ ...prev, email: e.target.value }));
+                      if (signInErrors.email) {
+                        setSignInErrors(prev => ({ ...prev, email: undefined }));
+                      }
+                    }}
+                    className={cn(signInErrors.email && 'border-red-500')}
+                    disabled={loading}
+                  />
+                  {signInErrors.email && (
+                    <p className="text-sm text-red-600">{signInErrors.email}</p>
+                  )}
+                  
+                  <div className="relative">
+                    <Input
+                      placeholder="Password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={signInForm.password}
+                      onChange={(e) => {
+                        setSignInForm(prev => ({ ...prev, password: e.target.value }));
+                        if (signInErrors.password) {
+                          setSignInErrors(prev => ({ ...prev, password: undefined }));
+                        }
+                      }}
+                      className={cn(signInErrors.password && 'border-red-500', 'pr-10')}
+                      disabled={loading}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={loading}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
+                  {signInErrors.password && (
+                    <p className="text-sm text-red-600">{signInErrors.password}</p>
+                  )}
+                </div>
+                
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Signing In...
+                    </>
+                  ) : (
+                    'Sign In'
+                  )}
+                </Button>
+              </form>
+              
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                </div>
               </div>
-              <Button className="w-full" variant="default">
-                Sign In
-              </Button>
+              
               <Button
                 type="button"
                 variant="outline"
                 className="w-full flex items-center justify-center gap-2"
-                onClick={async () => {
-                  const { error } = await supabase.auth.signInWithOAuth({
-                    provider: "google",
-                    options: {
-                      redirectTo: window.location.origin,
-                    },
-                  });
-                  if (error) {
-                    toast({
-                      title: "Google sign-in failed",
-                      description: error.message,
-                      variant: "destructive",
-                    });
-                  }
-                }}
+                onClick={handleGoogleSignIn}
+                disabled={loading}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="w-5 h-5">
                   <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.599 32.438 29.195 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.158 7.961 3.039l5.657-5.657C34.869 6.053 29.73 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20c10.493 0 19-8.507 19-19 0-1.262-.131-2.496-.389-3.917z"/>
@@ -70,6 +451,7 @@ const Auth = () => {
                 </svg>
                 Continue with Google
               </Button>
+              
               <div className="text-center text-sm">
                 <Link to="/forgot-password" className="text-primary hover:underline">
                   Forgot your password?
@@ -77,53 +459,286 @@ const Auth = () => {
               </div>
             </TabsContent>
             
+            {/* Sign Up Tab */}
             <TabsContent value="signup" className="space-y-4">
-              <div className="space-y-4">
-                <Select value={userType} onValueChange={setUserType}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="I want to join as..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="individual">Individual Donor</SelectItem>
-                    <SelectItem value="nonprofit">Non-Profit Organization</SelectItem>
-                    <SelectItem value="business">Business/Corporate</SelectItem>
-                    <SelectItem value="volunteer">Volunteer</SelectItem>
-                    <SelectItem value="recipient">Someone in Need</SelectItem>
-                  </SelectContent>
-                </Select>
+              <form onSubmit={handleSignUp} className="space-y-4">
+                <input type="hidden" name="csrf_token" value={csrfToken} />
                 
-                {userType && (
-                  <div className="space-y-2">
-                    <Input placeholder="Full name" />
-                    <Input placeholder="Email address" type="email" />
-                    <Input placeholder="Phone number" type="tel" />
-                    <Input placeholder="Password" type="password" />
-                    <Input placeholder="Confirm password" type="password" />
-                    
-                    {userType === "nonprofit" && (
-                      <>
-                        <Input placeholder="Organization name" />
-                        <Input placeholder="Registration number" />
-                        <Input placeholder="Website" />
-                      </>
-                    )}
-                    
-                    {userType === "business" && (
-                      <>
-                        <Input placeholder="Company name" />
-                        <Input placeholder="Business registration" />
-                        <Input placeholder="Website" />
-                      </>
+                <div className="space-y-4">
+                  <div>
+                    <Select 
+                      value={signUpForm.userType} 
+                      onValueChange={(value) => {
+                        setSignUpForm(prev => ({ ...prev, userType: value }));
+                        if (signUpErrors.userType) {
+                          setSignUpErrors(prev => ({ ...prev, userType: undefined }));
+                        }
+                      }}
+                      disabled={loading}
+                    >
+                      <SelectTrigger className={cn(signUpErrors.userType && 'border-red-500')}>
+                        <SelectValue placeholder="I want to join as..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="individual">Individual Donor</SelectItem>
+                        <SelectItem value="nonprofit">Non-Profit Organization</SelectItem>
+                        <SelectItem value="business">Business/Corporate</SelectItem>
+                        <SelectItem value="volunteer">Volunteer</SelectItem>
+                        <SelectItem value="recipient">Someone in Need</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {signUpErrors.userType && (
+                      <p className="text-sm text-red-600 mt-1">{signUpErrors.userType}</p>
                     )}
                   </div>
+                  
+                  {signUpForm.userType && (
+                    <div className="space-y-3">
+                      <div>
+                        <Input 
+                          placeholder="Full name" 
+                          value={signUpForm.fullName}
+                          onChange={(e) => {
+                            setSignUpForm(prev => ({ ...prev, fullName: e.target.value }));
+                            if (signUpErrors.fullName) {
+                              setSignUpErrors(prev => ({ ...prev, fullName: undefined }));
+                            }
+                          }}
+                          className={cn(signUpErrors.fullName && 'border-red-500')}
+                          disabled={loading}
+                        />
+                        {signUpErrors.fullName && (
+                          <p className="text-sm text-red-600 mt-1">{signUpErrors.fullName}</p>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <Input 
+                          placeholder="Email address" 
+                          type="email" 
+                          value={signUpForm.email}
+                          onChange={(e) => {
+                            setSignUpForm(prev => ({ ...prev, email: e.target.value }));
+                            if (signUpErrors.email) {
+                              setSignUpErrors(prev => ({ ...prev, email: undefined }));
+                            }
+                          }}
+                          className={cn(signUpErrors.email && 'border-red-500')}
+                          disabled={loading}
+                        />
+                        {signUpErrors.email && (
+                          <p className="text-sm text-red-600 mt-1">{signUpErrors.email}</p>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <Input 
+                          placeholder="Phone number" 
+                          type="tel" 
+                          value={signUpForm.phoneNumber}
+                          onChange={(e) => {
+                            setSignUpForm(prev => ({ ...prev, phoneNumber: e.target.value }));
+                          }}
+                          disabled={loading}
+                        />
+                      </div>
+                      
+                      <div>
+                        <div className="relative">
+                          <Input 
+                            placeholder="Password" 
+                            type={showPassword ? 'text' : 'password'}
+                            value={signUpForm.password}
+                            onChange={(e) => {
+                              setSignUpForm(prev => ({ ...prev, password: e.target.value }));
+                              if (signUpErrors.password) {
+                                setSignUpErrors(prev => ({ ...prev, password: undefined }));
+                              }
+                            }}
+                            className={cn(signUpErrors.password && 'border-red-500', 'pr-10')}
+                            disabled={loading}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowPassword(!showPassword)}
+                            disabled={loading}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </Button>
+                        </div>
+                        {signUpErrors.password && (
+                          <p className="text-sm text-red-600 mt-1">{signUpErrors.password}</p>
+                        )}
+                        
+                        {/* Password Strength Indicator */}
+                        {signUpForm.password && (
+                          <div className="mt-2">
+                            <PasswordStrength 
+                              password={signUpForm.password} 
+                              showRequirements={true}
+                              className="text-xs"
+                            />
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <div className="relative">
+                          <Input 
+                            placeholder="Confirm password" 
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            value={signUpForm.confirmPassword}
+                            onChange={(e) => {
+                              setSignUpForm(prev => ({ ...prev, confirmPassword: e.target.value }));
+                              if (signUpErrors.confirmPassword) {
+                                setSignUpErrors(prev => ({ ...prev, confirmPassword: undefined }));
+                              }
+                            }}
+                            className={cn(signUpErrors.confirmPassword && 'border-red-500', 'pr-10')}
+                            disabled={loading}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            disabled={loading}
+                          >
+                            {showConfirmPassword ? (
+                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </Button>
+                        </div>
+                        {signUpErrors.confirmPassword && (
+                          <p className="text-sm text-red-600 mt-1">{signUpErrors.confirmPassword}</p>
+                        )}
+                      </div>
+                      
+                      {/* Conditional Fields */}
+                      {signUpForm.userType === 'nonprofit' && (
+                        <>
+                          <div>
+                            <Input 
+                              placeholder="Organization name" 
+                              value={signUpForm.organizationName || ''}
+                              onChange={(e) => {
+                                setSignUpForm(prev => ({ ...prev, organizationName: e.target.value }));
+                                if (signUpErrors.organizationName) {
+                                  setSignUpErrors(prev => ({ ...prev, organizationName: undefined }));
+                                }
+                              }}
+                              className={cn(signUpErrors.organizationName && 'border-red-500')}
+                              disabled={loading}
+                            />
+                            {signUpErrors.organizationName && (
+                              <p className="text-sm text-red-600 mt-1">{signUpErrors.organizationName}</p>
+                            )}
+                          </div>
+                          <div>
+                            <Input 
+                              placeholder="Registration number" 
+                              value={signUpForm.registrationNumber || ''}
+                              onChange={(e) => {
+                                setSignUpForm(prev => ({ ...prev, registrationNumber: e.target.value }));
+                                if (signUpErrors.registrationNumber) {
+                                  setSignUpErrors(prev => ({ ...prev, registrationNumber: undefined }));
+                                }
+                              }}
+                              className={cn(signUpErrors.registrationNumber && 'border-red-500')}
+                              disabled={loading}
+                            />
+                            {signUpErrors.registrationNumber && (
+                              <p className="text-sm text-red-600 mt-1">{signUpErrors.registrationNumber}</p>
+                            )}
+                          </div>
+                          <Input 
+                            placeholder="Website (optional)" 
+                            value={signUpForm.website || ''}
+                            onChange={(e) => {
+                              setSignUpForm(prev => ({ ...prev, website: e.target.value }));
+                            }}
+                            disabled={loading}
+                          />
+                        </>
+                      )}
+                      
+                      {signUpForm.userType === 'business' && (
+                        <>
+                          <div>
+                            <Input 
+                              placeholder="Company name" 
+                              value={signUpForm.companyName || ''}
+                              onChange={(e) => {
+                                setSignUpForm(prev => ({ ...prev, companyName: e.target.value }));
+                                if (signUpErrors.companyName) {
+                                  setSignUpErrors(prev => ({ ...prev, companyName: undefined }));
+                                }
+                              }}
+                              className={cn(signUpErrors.companyName && 'border-red-500')}
+                              disabled={loading}
+                            />
+                            {signUpErrors.companyName && (
+                              <p className="text-sm text-red-600 mt-1">{signUpErrors.companyName}</p>
+                            )}
+                          </div>
+                          <div>
+                            <Input 
+                              placeholder="Business registration" 
+                              value={signUpForm.businessRegistration || ''}
+                              onChange={(e) => {
+                                setSignUpForm(prev => ({ ...prev, businessRegistration: e.target.value }));
+                                if (signUpErrors.businessRegistration) {
+                                  setSignUpErrors(prev => ({ ...prev, businessRegistration: undefined }));
+                                }
+                              }}
+                              className={cn(signUpErrors.businessRegistration && 'border-red-500')}
+                              disabled={loading}
+                            />
+                            {signUpErrors.businessRegistration && (
+                              <p className="text-sm text-red-600 mt-1">{signUpErrors.businessRegistration}</p>
+                            )}
+                          </div>
+                          <Input 
+                            placeholder="Website (optional)" 
+                            value={signUpForm.website || ''}
+                            onChange={(e) => {
+                              setSignUpForm(prev => ({ ...prev, website: e.target.value }));
+                            }}
+                            disabled={loading}
+                          />
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+                
+                {signUpForm.userType && (
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating Account...
+                      </>
+                    ) : (
+                      'Create Account'
+                    )}
+                  </Button>
                 )}
-              </div>
-              
-              {userType && (
-                <Button className="w-full" variant="default">
-                  Create Account
-                </Button>
-              )}
+              </form>
             </TabsContent>
           </Tabs>
           
