@@ -14,13 +14,184 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      donation_receipts: {
+        Row: {
+          created_at: string | null
+          donation_id: string
+          id: string
+          receipt_number: string
+          receipt_url: string | null
+          sent_at: string | null
+          tax_deductible_amount: number
+        }
+        Insert: {
+          created_at?: string | null
+          donation_id: string
+          id?: string
+          receipt_number: string
+          receipt_url?: string | null
+          sent_at?: string | null
+          tax_deductible_amount: number
+        }
+        Update: {
+          created_at?: string | null
+          donation_id?: string
+          id?: string
+          receipt_number?: string
+          receipt_url?: string | null
+          sent_at?: string | null
+          tax_deductible_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "donation_receipts_donation_id_fkey"
+            columns: ["donation_id"]
+            isOneToOne: false
+            referencedRelation: "donations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      donations: {
+        Row: {
+          amount: number
+          created_at: string | null
+          currency: string
+          donor_email: string
+          donor_name: string
+          donor_phone: string | null
+          frequency: string | null
+          id: string
+          is_anonymous: boolean | null
+          is_recurring: boolean | null
+          message: string | null
+          payment_intent_id: string
+          payment_method_id: string | null
+          payment_status: string
+          processed_at: string | null
+          target_id: string | null
+          target_name: string
+          target_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          currency?: string
+          donor_email: string
+          donor_name: string
+          donor_phone?: string | null
+          frequency?: string | null
+          id?: string
+          is_anonymous?: boolean | null
+          is_recurring?: boolean | null
+          message?: string | null
+          payment_intent_id: string
+          payment_method_id?: string | null
+          payment_status?: string
+          processed_at?: string | null
+          target_id?: string | null
+          target_name: string
+          target_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          currency?: string
+          donor_email?: string
+          donor_name?: string
+          donor_phone?: string | null
+          frequency?: string | null
+          id?: string
+          is_anonymous?: boolean | null
+          is_recurring?: boolean | null
+          message?: string | null
+          payment_intent_id?: string
+          payment_method_id?: string | null
+          payment_status?: string
+          processed_at?: string | null
+          target_id?: string | null
+          target_name?: string
+          target_type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          amount: number
+          canceled_at: string | null
+          created_at: string | null
+          currency: string
+          customer_email: string
+          customer_name: string
+          donation_id: string
+          frequency: string
+          id: string
+          next_payment_date: string | null
+          status: string
+          subscription_id: string
+          target_id: string | null
+          target_name: string
+          target_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          canceled_at?: string | null
+          created_at?: string | null
+          currency?: string
+          customer_email: string
+          customer_name: string
+          donation_id: string
+          frequency: string
+          id?: string
+          next_payment_date?: string | null
+          status?: string
+          subscription_id: string
+          target_id?: string | null
+          target_name: string
+          target_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          canceled_at?: string | null
+          created_at?: string | null
+          currency?: string
+          customer_email?: string
+          customer_name?: string
+          donation_id?: string
+          frequency?: string
+          id?: string
+          next_payment_date?: string | null
+          status?: string
+          subscription_id?: string
+          target_id?: string | null
+          target_name?: string
+          target_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_donation_id_fkey"
+            columns: ["donation_id"]
+            isOneToOne: false
+            referencedRelation: "donations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_receipt_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

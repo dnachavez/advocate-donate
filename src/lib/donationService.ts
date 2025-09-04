@@ -1,6 +1,7 @@
 import { paymentService, DonationData, PaymentResult, MockPaymentMethod } from './payment';
 import { isAuthenticated, validateAndRefreshSession } from './auth';
 import { supabase } from '@/integrations/supabase/client';
+import type { TablesInsert } from '@/integrations/supabase/types';
 
 // Donation form state interface
 export interface DonationFormState {
@@ -211,15 +212,50 @@ class DonationService {
       }
 
       // Save donation to database
-      const donationId = await paymentService.saveDonationToDatabase(
-        donationData,
-        paymentResult
-      );
+      let donationId: string;
+      try {
+        donationId = await paymentService.saveDonationToDatabase(
+          donationData,
+          paymentResult
+        );
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to save donation to database',
+          paymentResult,
+        };
+      }
 
       // Handle recurring donations
-      if (formState.isRecurring) {
+      if (formState.isRecurring && donationId) {
         try {
-          await paymentService.createSubscription(donationData);
+          // Create mock subscription
+          const subscription = await paymentService.createSubscription(donationData);
+          
+          // Save subscription to database
+          const dbSubscription: TablesInsert<'subscriptions'> = {
+            amount: donationData.amount,
+            currency: donationData.currency.toLowerCase(),
+            customer_email: donationData.donorEmail,
+            customer_name: donationData.donorName,
+            donation_id: donationId,
+            frequency: donationData.frequency!,
+            subscription_id: subscription.id,
+            target_type: donationData.campaignId ? 'campaign' : 'organization',
+            target_name: context?.campaignTitle || context?.organizationName || '',
+            target_id: donationData.campaignId || donationData.organizationId || null,
+            status: 'active',
+            next_payment_date: null
+          };
+
+          const { error } = await supabase
+            .from('subscriptions')
+            .insert(dbSubscription);
+
+          if (error) {
+            console.error('Failed to save subscription to database:', error);
+            // Don't fail the entire donation if subscription creation fails
+          }
         } catch (error) {
           console.error('Failed to create subscription:', error);
           // Don't fail the entire donation if subscription creation fails

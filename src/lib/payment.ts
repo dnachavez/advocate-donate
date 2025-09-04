@@ -1,4 +1,6 @@
 // Types for payment processing
+import type { TablesInsert } from '@/integrations/supabase/types';
+
 export interface PaymentIntent {
   id: string;
   amount: number;
@@ -214,6 +216,9 @@ class MockPaymentService {
         created: new Date().toISOString(),
       };
 
+      // Note: Database saving for subscriptions is handled in the donation service
+      // after the donation is successfully saved
+
       console.log('Mock subscription created:', subscription);
       return subscription;
     } catch (error) {
@@ -261,33 +266,45 @@ class MockPaymentService {
   }
 
   /**
-   * Save donation to database (mock implementation)
+   * Save donation to Supabase database
    */
   async saveDonationToDatabase(donationData: DonationData, paymentResult: PaymentResult): Promise<string> {
     try {
-      // This would typically integrate with your database (Supabase, etc.)
-      const donation = {
-        id: paymentResult.donationId,
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      // Map the donation data to match the database schema
+      const donationRecord: TablesInsert<'donations'> = {
         amount: donationData.amount,
-        currency: donationData.currency,
+        currency: donationData.currency.toLowerCase(),
         donor_email: donationData.donorEmail,
         donor_name: donationData.donorName,
-        campaign_id: donationData.campaignId,
-        organization_id: donationData.organizationId,
+        donor_phone: null,
+        target_type: donationData.campaignId ? 'campaign' : 'organization',
+        target_name: '', // This would need to be fetched from the campaign/organization
+        target_id: donationData.campaignId || donationData.organizationId || null,
+        payment_intent_id: paymentResult.paymentIntent?.id || null,
+        payment_method_id: null,
+        payment_status: 'completed',
         is_recurring: donationData.isRecurring || false,
-        frequency: donationData.frequency,
-        message: donationData.message,
-        payment_intent_id: paymentResult.paymentIntent?.id,
-        status: 'completed',
-        created_at: new Date().toISOString(),
+        frequency: donationData.frequency || null,
+        is_anonymous: false,
+        message: donationData.message || null,
+        processed_at: new Date().toISOString()
       };
 
-      console.log('Donation saved to database (mock):', donation);
-      
-      // Simulate database save delay
-      await this.simulateDelay();
-      
-      return donation.id || 'mock_donation_id';
+      const { data, error } = await supabase
+        .from('donations')
+        .insert([donationRecord])
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('Supabase error saving donation:', error);
+        throw new Error(`Failed to save donation: ${error.message}`);
+      }
+
+      console.log('Donation saved to Supabase:', data);
+      return data.id;
     } catch (error) {
       console.error('Error saving donation to database:', error);
       throw new Error('Failed to save donation');
