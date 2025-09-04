@@ -232,9 +232,11 @@ class DonationService {
       // Save donation to database
       let donationId: string;
       try {
+        const targetName = context?.campaignTitle || context?.organizationName || 'General Fund';
         donationId = await paymentService.saveDonationToDatabase(
           donationData,
-          paymentResult
+          paymentResult,
+          targetName
         );
       } catch (error) {
         return {

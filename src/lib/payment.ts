@@ -268,7 +268,7 @@ class MockPaymentService {
   /**
    * Save donation to Supabase database
    */
-  async saveDonationToDatabase(donationData: DonationData, paymentResult: PaymentResult): Promise<string> {
+  async saveDonationToDatabase(donationData: DonationData, paymentResult: PaymentResult, targetName?: string): Promise<string> {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
@@ -279,12 +279,12 @@ class MockPaymentService {
         donor_email: donationData.donorEmail,
         donor_name: donationData.donorName,
         donor_phone: null,
-        target_type: donationData.campaignId ? 'campaign' : 'organization',
-        target_name: '', // This would need to be fetched from the campaign/organization
+        target_type: donationData.campaignId ? 'campaign' : (donationData.organizationId ? 'organization' : 'general'),
+        target_name: targetName || (donationData.campaignId ? 'Campaign Donation' : (donationData.organizationId ? 'Organization Donation' : 'General Fund')),
         target_id: donationData.campaignId || donationData.organizationId || null,
         payment_intent_id: paymentResult.paymentIntent?.id || null,
         payment_method_id: null,
-        payment_status: 'completed',
+        payment_status: 'succeeded',
         is_recurring: donationData.isRecurring || false,
         frequency: donationData.frequency || null,
         is_anonymous: false,
