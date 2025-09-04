@@ -166,15 +166,6 @@ const Auth = () => {
       }
     }
     
-    if (signUpForm.userType === 'business') {
-      if (!signUpForm.companyName?.trim()) {
-        errors.companyName = 'Company name is required';
-      }
-      if (!signUpForm.businessRegistration?.trim()) {
-        errors.businessRegistration = 'Business registration is required';
-      }
-    }
-    
     setSignUpErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -247,14 +238,6 @@ const Auth = () => {
       if (signUpForm.userType === 'nonprofit') {
         additionalData.organization_name = sanitizeInput(signUpForm.organizationName || '');
         additionalData.registration_number = sanitizeInput(signUpForm.registrationNumber || '');
-        if (signUpForm.website) {
-          additionalData.website = sanitizeInput(signUpForm.website);
-        }
-      }
-      
-      if (signUpForm.userType === 'business') {
-        additionalData.company_name = sanitizeInput(signUpForm.companyName || '');
-        additionalData.business_registration = sanitizeInput(signUpForm.businessRegistration || '');
         if (signUpForm.website) {
           additionalData.website = sanitizeInput(signUpForm.website);
         }
@@ -489,31 +472,47 @@ const Auth = () => {
                 <input type="hidden" name="csrf_token" value={csrfToken} />
                 
                 <div className="space-y-4">
-                  <div>
-                    <Select 
-                      value={signUpForm.userType} 
-                      onValueChange={(value) => {
-                        setSignUpForm(prev => ({ ...prev, userType: value }));
-                        if (signUpErrors.userType) {
-                          setSignUpErrors(prev => ({ ...prev, userType: undefined }));
-                        }
-                      }}
-                      disabled={loading}
-                    >
-                      <SelectTrigger className={cn(signUpErrors.userType && 'border-red-500')}>
-                        <SelectValue placeholder="I want to join as..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="individual">Individual Donor</SelectItem>
-                        <SelectItem value="nonprofit">Non-Profit Organization</SelectItem>
-                        <SelectItem value="business">Business/Corporate</SelectItem>
-                        <SelectItem value="volunteer">Volunteer</SelectItem>
-                        <SelectItem value="recipient">Someone in Need</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {signUpErrors.userType && (
-                      <p className="text-sm text-red-600 mt-1">{signUpErrors.userType}</p>
-                    )}
+                  <div className="space-y-3">
+                    <div>
+                      <Select 
+                        value={signUpForm.userType} 
+                        onValueChange={(value) => {
+                          setSignUpForm(prev => ({ ...prev, userType: value }));
+                          if (signUpErrors.userType) {
+                            setSignUpErrors(prev => ({ ...prev, userType: undefined }));
+                          }
+                        }}
+                        disabled={loading}
+                      >
+                        <SelectTrigger className={cn(signUpErrors.userType && 'border-red-500')}>
+                          <SelectValue placeholder="I want to join as..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="individual">Individual Donor</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {signUpErrors.userType && (
+                        <p className="text-sm text-red-600 mt-1">{signUpErrors.userType}</p>
+                      )}
+                    </div>
+                    
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground mb-2">or</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => {
+                          setSignUpForm(prev => ({ ...prev, userType: 'nonprofit' }));
+                          if (signUpErrors.userType) {
+                            setSignUpErrors(prev => ({ ...prev, userType: undefined }));
+                          }
+                        }}
+                        disabled={loading}
+                      >
+                        Sign up as Organization
+                      </Button>
+                    </div>
                   </div>
                   
                   {signUpForm.userType && (
@@ -696,52 +695,6 @@ const Auth = () => {
                         </>
                       )}
                       
-                      {signUpForm.userType === 'business' && (
-                        <>
-                          <div>
-                            <Input 
-                              placeholder="Company name" 
-                              value={signUpForm.companyName || ''}
-                              onChange={(e) => {
-                                setSignUpForm(prev => ({ ...prev, companyName: e.target.value }));
-                                if (signUpErrors.companyName) {
-                                  setSignUpErrors(prev => ({ ...prev, companyName: undefined }));
-                                }
-                              }}
-                              className={cn(signUpErrors.companyName && 'border-red-500')}
-                              disabled={loading}
-                            />
-                            {signUpErrors.companyName && (
-                              <p className="text-sm text-red-600 mt-1">{signUpErrors.companyName}</p>
-                            )}
-                          </div>
-                          <div>
-                            <Input 
-                              placeholder="Business registration" 
-                              value={signUpForm.businessRegistration || ''}
-                              onChange={(e) => {
-                                setSignUpForm(prev => ({ ...prev, businessRegistration: e.target.value }));
-                                if (signUpErrors.businessRegistration) {
-                                  setSignUpErrors(prev => ({ ...prev, businessRegistration: undefined }));
-                                }
-                              }}
-                              className={cn(signUpErrors.businessRegistration && 'border-red-500')}
-                              disabled={loading}
-                            />
-                            {signUpErrors.businessRegistration && (
-                              <p className="text-sm text-red-600 mt-1">{signUpErrors.businessRegistration}</p>
-                            )}
-                          </div>
-                          <Input 
-                            placeholder="Website (optional)" 
-                            value={signUpForm.website || ''}
-                            onChange={(e) => {
-                              setSignUpForm(prev => ({ ...prev, website: e.target.value }));
-                            }}
-                            disabled={loading}
-                          />
-                        </>
-                      )}
                     </div>
                   )}
                 </div>
