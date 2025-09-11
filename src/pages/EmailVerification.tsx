@@ -17,24 +17,142 @@ const EmailVerification = () => {
   const [resendLoading, setResendLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   
-  // Get verification parameters from URL
+  // Parse URL hash parameters (Supabase auth callback)
+  const parseHashParams = () => {
+    const hash = window.location.hash.substring(1);
+    const params = new URLSearchParams(hash);
+    return {
+      error: params.get('error'),
+      error_code: params.get('error_code'),
+      error_description: params.get('error_description'),
+      access_token: params.get('access_token'),
+      refresh_token: params.get('refresh_token'),
+      type: params.get('type')
+    };
+  };
+
+  // Get verification parameters from URL (search params for manual verification)
   const token = searchParams.get('token');
   const type = searchParams.get('type');
   const email = searchParams.get('email');
   
   useEffect(() => {
-    // Handle email verification from URL parameters
-    if (token && type === 'signup') {
+    // Handle Supabase auth callback from URL hash
+    const hashParams = parseHashParams();
+    
+    if (hashParams.error) {
+      handleHashError(hashParams);
+    } else if (hashParams.access_token) {
+      handleHashSuccess();
+    } else if (token && type === 'signup') {
+      // Handle manual verification with token
       verifyEmail();
     } else if (type === 'confirmation') {
       // Handle email confirmation link click
       handleEmailConfirmation();
     } else {
-      setLoading(false);
-      setVerificationStatus('error');
-      setErrorMessage('Invalid verification link');
+      // No valid parameters, wait for Supabase auth state change
+      handleAuthStateChange();
     }
   }, [token, type]);
+
+  const handleHashError = (hashParams: any) => {
+    setLoading(false);
+    
+    if (hashParams.error_code === 'otp_expired' || hashParams.error_description?.includes('expired')) {
+      setVerificationStatus('expired');
+      setErrorMessage('This verification link has expired. Please request a new one.');
+    } else if (hashParams.error === 'access_denied') {
+      setVerificationStatus('error');
+      setErrorMessage(hashParams.error_description || 'Access denied. Please try again.');
+    } else {
+      setVerificationStatus('error');
+      setErrorMessage(hashParams.error_description || 'Email verification failed. Please try again.');
+    }
+  };
+
+  const handleHashSuccess = async () => {
+    try {
+      // Wait a moment for Supabase to process the authentication
+      setTimeout(async () => {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          setVerificationStatus('error');
+          setErrorMessage(error.message);
+          setLoading(false);
+          return;
+        }
+
+        if (session?.user) {
+          setVerificationStatus('success');
+          setLoading(false);
+          toast({
+            title: 'Email verified successfully!',
+            description: 'Your account has been activated. Welcome!',
+          });
+          
+          // Redirect to dashboard after success
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 2000);
+        } else {
+          setVerificationStatus('error');
+          setErrorMessage('Session not found. Please try signing in.');
+          setLoading(false);
+        }
+      }, 1000);
+    } catch (error) {
+      console.error('Error handling hash success:', error);
+      setVerificationStatus('error');
+      setErrorMessage('An unexpected error occurred');
+      setLoading(false);
+    }
+  };
+
+  const handleAuthStateChange = async () => {
+    try {
+      // Listen for auth state changes
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          console.log('Auth event in verification:', event);
+          
+          if (event === 'SIGNED_IN' && session?.user) {
+            setVerificationStatus('success');
+            setLoading(false);
+            toast({
+              title: 'Email verified successfully!',
+              description: 'Your account has been activated. Welcome!',
+            });
+            
+            setTimeout(() => {
+              navigate('/dashboard');
+            }, 2000);
+          } else if (event === 'SIGNED_OUT') {
+            setLoading(false);
+            setVerificationStatus('error');
+            setErrorMessage('Verification failed. Please try again.');
+          }
+        }
+      );
+
+      // Clean up subscription after 10 seconds if no auth event
+      setTimeout(() => {
+        subscription.unsubscribe();
+        if (loading) {
+          setLoading(false);
+          setVerificationStatus('error');
+          setErrorMessage('No verification data found. Please check your email link.');
+        }
+      }, 10000);
+
+    } catch (error) {
+      console.error('Error setting up auth listener:', error);
+      setLoading(false);
+      setVerificationStatus('error');
+      setErrorMessage('An unexpected error occurred');
+    }
+  };
   
   // Start resend cooldown timer
   useEffect(() => {
@@ -128,14 +246,27 @@ const EmailVerification = () => {
   };
   
   const resendVerificationEmail = async () => {
-    if (!email || resendCooldown > 0) return;
+    if (resendCooldown > 0) return;
+    
+    // If we don't have email from URL params, prompt user to enter it
+    if (!email) {
+      toast({
+        title: 'Email required',
+        description: 'Please go back to the sign-up page to request a new verification email.',
+        variant: 'destructive',
+      });
+      return;
+    }
     
     try {
       setResendLoading(true);
       
       const { error } = await supabase.auth.resend({
         type: 'signup',
-        email: email
+        email: email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/verify-email`
+        }
       });
       
       if (error) {
@@ -198,13 +329,14 @@ const EmailVerification = () => {
             <AlertCircle className="w-16 h-16 text-orange-500 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-orange-800 mb-2">Verification Link Expired</h3>
             <p className="text-muted-foreground mb-6">
-              This verification link has expired. Please request a new verification email.
+              This verification link has expired. Please sign up again to get a new verification email.
             </p>
-            {email && (
-              <div className="space-y-4">
+            <div className="space-y-4">
+              {email && (
                 <Button 
                   onClick={resendVerificationEmail}
                   disabled={resendLoading || resendCooldown > 0}
+                  variant="outline"
                   className="w-full"
                 >
                   {resendLoading ? (
@@ -215,14 +347,14 @@ const EmailVerification = () => {
                   ) : resendCooldown > 0 ? (
                     `Resend in ${resendCooldown}s`
                   ) : (
-                    'Resend Verification Email'
+                    'Try Resending Email'
                   )}
                 </Button>
-                <Button variant="outline" onClick={() => navigate('/auth')} className="w-full">
-                  Back to Sign Up
-                </Button>
-              </div>
-            )}
+              )}
+              <Button onClick={() => navigate('/auth?tab=signup')} className="w-full">
+                Back to Sign Up
+              </Button>
+            </div>
           </div>
         );
         
@@ -255,7 +387,7 @@ const EmailVerification = () => {
                   )}
                 </Button>
               )}
-              <Button onClick={() => navigate('/auth')} className="w-full">
+              <Button onClick={() => navigate('/auth?tab=signup')} className="w-full">
                 Back to Sign Up
               </Button>
             </div>

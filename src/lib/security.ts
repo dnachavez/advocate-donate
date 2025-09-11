@@ -99,21 +99,13 @@ export const getSecurityHeaders = (): Record<string, string> => {
 
 // Apply security headers to document
 export const applySecurityHeaders = (): void => {
-  const headers = getSecurityHeaders();
+  // Note: Some security headers like 'frame-ancestors' and 'X-Frame-Options' 
+  // can only be set via HTTP headers, not meta tags. These should be configured
+  // on your web server (e.g., Vercel, Netlify) for production.
   
-  // Apply CSP via meta tag (fallback for client-side)
-  const existingCSP = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
-  if (!existingCSP) {
-    const cspMeta = document.createElement('meta');
-    cspMeta.httpEquiv = 'Content-Security-Policy';
-    cspMeta.content = headers['Content-Security-Policy'];
-    document.head.appendChild(cspMeta);
-  }
-  
-  // Apply other security headers via meta tags where possible
+  // Apply only the headers that can work via meta tags
   const metaHeaders = {
     'X-Content-Type-Options': 'nosniff',
-    'X-Frame-Options': 'DENY',
     'Referrer-Policy': 'strict-origin-when-cross-origin'
   };
   
@@ -126,6 +118,66 @@ export const applySecurityHeaders = (): void => {
       document.head.appendChild(meta);
     }
   });
+
+  // Apply a simplified CSP via meta tag (without frame-ancestors which is not allowed in meta)
+  const existingCSP = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
+  if (!existingCSP) {
+    const policies = {
+      'default-src': ["'self'"],
+      'script-src': [
+        "'self'",
+        "'unsafe-inline'", // Required for Vite in development
+        "'unsafe-eval'", // Required for Vite in development
+        'https://js.stripe.com',
+        'https://checkout.stripe.com',
+        'https://maps.googleapis.com'
+      ],
+      'style-src': [
+        "'self'",
+        "'unsafe-inline'", // Required for styled-components and CSS-in-JS
+        'https://fonts.googleapis.com'
+      ],
+      'font-src': [
+        "'self'",
+        'https://fonts.gstatic.com',
+        'data:'
+      ],
+      'img-src': [
+        "'self'",
+        'data:',
+        'blob:',
+        'https:',
+        'https://*.supabase.co',
+        'https://*.supabase.in'
+      ],
+      'connect-src': [
+        "'self'",
+        'https://*.supabase.co',
+        'https://*.supabase.in',
+        'https://api.stripe.com',
+        'wss://*.supabase.co',
+        'wss://*.supabase.in'
+      ],
+      'frame-src': [
+        "'self'",
+        'https://js.stripe.com',
+        'https://checkout.stripe.com'
+      ],
+      'object-src': ["'none'"],
+      'base-uri': ["'self'"],
+      'form-action': ["'self'"]
+      // Note: 'frame-ancestors' removed as it cannot be set via meta tag
+    };
+
+    const cspContent = Object.entries(policies)
+      .map(([directive, sources]) => `${directive} ${sources.join(' ')}`)
+      .join('; ');
+
+    const cspMeta = document.createElement('meta');
+    cspMeta.httpEquiv = 'Content-Security-Policy';
+    cspMeta.content = cspContent;
+    document.head.appendChild(cspMeta);
+  }
 };
 
 // Input sanitization utilities
