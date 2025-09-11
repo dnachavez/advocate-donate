@@ -16,37 +16,15 @@ import { donationService, DonationFormState, DonationContext } from '../lib/dona
 import { MockPaymentMethod } from '../lib/payment';
 import DonationConfirmation from '../components/DonationConfirmation';
 import { useAuth } from "@/contexts/AuthContext";
+import { campaignService, type CampaignWithOrganization } from "@/lib/campaignService";
 
-// Minimal mock data to render campaign context
-const campaigns = [
-  {
-    id: 1,
-    title: "Emergency Food Distribution for Typhoon Victims",
-    organization: "Hope Community Center",
-    organizationSlug: "hope-community-center",
-    location: "Manila, Philippines",
-    category: "Emergency Relief",
-    daysLeft: 12,
-    image: campaignImage,
-    urgent: true,
-  },
-  {
-    id: 2,
-    title: "Build Safe Learning Spaces",
-    organization: "Education Bridge PH",
-    organizationSlug: "education-bridge-ph",
-    location: "Davao City, Philippines",
-    category: "Education",
-    daysLeft: 45,
-    image: campaignImage,
-    urgent: false,
-  },
-];
 
 const DonateCampaign = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const campaign = campaigns.find((c) => String(c.id) === id);
+  const [campaign, setCampaign] = useState<CampaignWithOrganization | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [selectedAmount, setSelectedAmount] = useState("");
   const [donationType, setDonationType] = useState("one-time");
@@ -60,7 +38,26 @@ const DonateCampaign = () => {
   useEffect(() => {
     setAvailablePaymentMethods(donationService.getAvailablePaymentMethods());
     initializeFormWithAuth();
-  }, []);
+    fetchCampaign();
+  }, [id]);
+
+  const fetchCampaign = async () => {
+    if (!id) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    const { data, error: fetchError } = await campaignService.getCampaignBySlug(id);
+    
+    if (fetchError) {
+      setError(fetchError);
+      setCampaign(null);
+    } else {
+      setCampaign(data);
+    }
+    
+    setLoading(false);
+  };
 
   const initializeFormWithAuth = async () => {
     setIsLoadingUserData(true);
@@ -112,9 +109,9 @@ const DonateCampaign = () => {
     
     try {
       const context: DonationContext = {
-        campaignId: campaign.id.toString(),
+        campaignId: campaign.id,
         campaignTitle: campaign.title,
-        organizationName: campaign.organization
+        organizationName: campaign.organization?.name || 'Unknown Organization'
       };
       
       const result = await donationService.processDonation(formState, context);
@@ -147,7 +144,26 @@ const DonateCampaign = () => {
     setSelectedAmount("");
   };
 
-  if (!campaign) {
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <Button variant="outline" onClick={() => navigate(-1)} className="mb-6">
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back
+          </Button>
+          <Card className="p-8 text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+            <h1 className="text-2xl font-semibold mb-2">Loading Campaign...</h1>
+            <p className="text-muted-foreground">Please wait while we fetch the campaign details.</p>
+          </Card>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (error || !campaign) {
     return (
       <div className="min-h-screen bg-background">
         <Navigation />
@@ -157,7 +173,9 @@ const DonateCampaign = () => {
           </Button>
           <Card className="p-8 text-center">
             <h1 className="text-2xl font-semibold mb-2">Campaign Not Found</h1>
-            <p className="text-muted-foreground mb-4">The campaign you are trying to donate to does not exist.</p>
+            <p className="text-muted-foreground mb-4">
+              {error || "The campaign you are trying to donate to does not exist."}
+            </p>
             <Link to="/campaigns">
               <Button variant="default">Browse Campaigns</Button>
             </Link>
@@ -178,18 +196,18 @@ const DonateCampaign = () => {
               <ArrowLeft className="w-4 h-4 mr-2" /> Back
             </Button>
             <div className="flex items-center gap-4">
-              <img src={campaign.image} alt={campaign.title} className="w-16 h-16 rounded-md object-cover" />
+              <img src={campaign.featured_image_url || campaignImage} alt={campaign.title} className="w-16 h-16 rounded-md object-cover" />
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-2xl font-bold text-foreground">Donate to: {campaign.title}</h1>
                   <Badge variant="outline" className="bg-white/90 text-foreground">{campaign.category}</Badge>
                 </div>
                 <div className="text-sm text-muted-foreground flex items-center gap-3 mt-1">
-                  <span className="flex items-center"><MapPin className="w-3 h-3 mr-1" /> {campaign.location}</span>
+                  <span className="flex items-center"><MapPin className="w-3 h-3 mr-1" /> {campaign.organization?.city}, {campaign.organization?.country}</span>
                   <span className="hidden sm:inline">•</span>
-                  <span className="flex items-center"><Clock className="w-3 h-3 mr-1" /> {campaign.daysLeft} days left</span>
+                  <span className="flex items-center"><Clock className="w-3 h-3 mr-1" /> {campaign.end_date ? Math.max(0, Math.ceil((new Date(campaign.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 'Ongoing'} days left</span>
                 </div>
-                <div className="text-sm text-muted-foreground mt-1">by {campaign.organization}</div>
+                <div className="text-sm text-muted-foreground mt-1">by {campaign.organization?.name}</div>
               </div>
             </div>
           </div>
@@ -283,7 +301,7 @@ const DonateCampaign = () => {
                               onClose={() => setShowDonationForm(false)}
                               onNewDonation={resetDonationFlow}
                               recipientType="campaign"
-                              recipientId={campaign.id.toString()}
+                              recipientId={campaign.id}
                             />
                           </div>
                         ) : (
@@ -305,7 +323,7 @@ const DonateCampaign = () => {
                               </div>
                               <div className="flex justify-between">
                                 <span>Organization:</span>
-                                <span className="text-sm">{campaign.organization}</span>
+                                <span className="text-sm">{campaign.organization?.name}</span>
                               </div>
                             </div>
 
