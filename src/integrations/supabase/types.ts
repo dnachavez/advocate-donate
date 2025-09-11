@@ -12,33 +12,55 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "13.0.4"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
+      admin_activity_log: {
+        Row: {
+          action: string
+          admin_user_id: string | null
+          created_at: string | null
+          id: string
+          ip_address: unknown | null
+          new_values: Json | null
+          old_values: Json | null
+          target_id: string | null
+          target_type: string
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          admin_user_id?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown | null
+          new_values?: Json | null
+          old_values?: Json | null
+          target_id?: string | null
+          target_type: string
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          admin_user_id?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown | null
+          new_values?: Json | null
+          old_values?: Json | null
+          target_id?: string | null
+          target_type?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_activity_log_admin_user_id_fkey"
+            columns: ["admin_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaigns: {
         Row: {
           accepts_anonymous_donations: boolean | null
@@ -51,6 +73,7 @@ export type Database = {
           description: string
           end_date: string | null
           featured_image_url: string | null
+          fund_usage_description: string | null
           goal_amount: number
           id: string
           images: string[] | null
@@ -87,6 +110,7 @@ export type Database = {
           description: string
           end_date?: string | null
           featured_image_url?: string | null
+          fund_usage_description?: string | null
           goal_amount: number
           id?: string
           images?: string[] | null
@@ -123,6 +147,7 @@ export type Database = {
           description?: string
           end_date?: string | null
           featured_image_url?: string | null
+          fund_usage_description?: string | null
           goal_amount?: number
           id?: string
           images?: string[] | null
@@ -412,6 +437,81 @@ export type Database = {
           },
         ]
       }
+      payment_methods: {
+        Row: {
+          bank_account_last4: string | null
+          bank_account_type: string | null
+          bank_name: string | null
+          billing_address: Json | null
+          card_brand: string | null
+          card_exp_month: number | null
+          card_exp_year: number | null
+          card_funding: string | null
+          card_last4: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          is_verified: boolean | null
+          last_used_at: string | null
+          nickname: string | null
+          provider: string
+          provider_payment_method_id: string
+          type: string
+          updated_at: string | null
+          user_id: string | null
+          verification_data: Json | null
+        }
+        Insert: {
+          bank_account_last4?: string | null
+          bank_account_type?: string | null
+          bank_name?: string | null
+          billing_address?: Json | null
+          card_brand?: string | null
+          card_exp_month?: number | null
+          card_exp_year?: number | null
+          card_funding?: string | null
+          card_last4?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          is_verified?: boolean | null
+          last_used_at?: string | null
+          nickname?: string | null
+          provider?: string
+          provider_payment_method_id: string
+          type: string
+          updated_at?: string | null
+          user_id?: string | null
+          verification_data?: Json | null
+        }
+        Update: {
+          bank_account_last4?: string | null
+          bank_account_type?: string | null
+          bank_name?: string | null
+          billing_address?: Json | null
+          card_brand?: string | null
+          card_exp_month?: number | null
+          card_exp_year?: number | null
+          card_funding?: string | null
+          card_last4?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          is_verified?: boolean | null
+          last_used_at?: string | null
+          nickname?: string | null
+          provider?: string
+          provider_payment_method_id?: string
+          type?: string
+          updated_at?: string | null
+          user_id?: string | null
+          verification_data?: Json | null
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           amount: number
@@ -494,6 +594,7 @@ export type Database = {
           profile_picture_url: string | null
           push_notifications: boolean | null
           registration_number: string | null
+          role: Database["public"]["Enums"]["user_role"] | null
           tax_id: string | null
           updated_at: string | null
           user_type: string
@@ -517,6 +618,7 @@ export type Database = {
           profile_picture_url?: string | null
           push_notifications?: boolean | null
           registration_number?: string | null
+          role?: Database["public"]["Enums"]["user_role"] | null
           tax_id?: string | null
           updated_at?: string | null
           user_type: string
@@ -540,6 +642,7 @@ export type Database = {
           profile_picture_url?: string | null
           push_notifications?: boolean | null
           registration_number?: string | null
+          role?: Database["public"]["Enums"]["user_role"] | null
           tax_id?: string | null
           updated_at?: string | null
           user_type?: string
@@ -554,13 +657,43 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_organization: {
+        Args: { org_id: string }
+        Returns: undefined
+      }
       generate_receipt_number: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      is_admin: {
+        Args: { user_id?: string }
+        Returns: boolean
+      }
+      is_super_admin: {
+        Args: { user_id?: string }
+        Returns: boolean
+      }
+      log_admin_action: {
+        Args: {
+          p_action: string
+          p_new_values?: Json
+          p_old_values?: Json
+          p_target_id: string
+          p_target_type: string
+        }
+        Returns: undefined
+      }
+      reject_organization: {
+        Args: { org_id: string; rejection_reason?: string }
+        Returns: undefined
+      }
+      suspend_organization: {
+        Args: { org_id: string; suspension_reason?: string }
+        Returns: undefined
+      }
     }
     Enums: {
-      [_ in never]: never
+      user_role: "user" | "admin" | "super_admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -686,10 +819,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
-    Enums: {},
+    Enums: {
+      user_role: ["user", "admin", "super_admin"],
+    },
   },
 } as const

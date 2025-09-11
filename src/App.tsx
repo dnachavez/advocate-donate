@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { RequireAuth, RequireVerification, PublicRoute } from "@/components/auth/ProtectedRoute";
+import { RequireAdmin } from "@/components/auth/RequireAdmin";
 import Index from "./pages/Index";
 import Organizations from "./pages/Organizations";
 import Campaigns from "./pages/Campaigns";
@@ -45,6 +46,11 @@ import PrivacySettings from "./pages/PrivacySettings";
 import PaymentMethods from "./pages/PaymentMethods";
 import NotificationSettings from "./pages/NotificationSettings";
 import ViewDonors from "./pages/ViewDonors";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminOrganizations from "./pages/admin/AdminOrganizations";
+import AdminCampaigns from "./pages/admin/AdminCampaigns";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminActivity from "./pages/admin/AdminActivity";
 
 const queryClient = new QueryClient();
 
@@ -155,6 +161,21 @@ const App = () => (
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<EmailVerification />} />
           <Route path="/donation/success/:donationId" element={<DonationSuccess />} />
+          
+          {/* Admin Routes */}
+          <Route path="/admin" element={
+            <RequireAuth>
+              <RequireAdmin>
+                <AdminDashboard />
+              </RequireAdmin>
+            </RequireAuth>
+          }>
+            <Route path="organizations" element={<AdminOrganizations />} />
+            <Route path="campaigns" element={<AdminCampaigns />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="activity" element={<AdminActivity />} />
+          </Route>
+          
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
           </Routes>
