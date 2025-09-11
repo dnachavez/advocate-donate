@@ -16,6 +16,7 @@ import {
 import { Link } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
 import { useToast } from '@/hooks/use-toast';
+import { paymentMethodService, PaymentMethodDB } from '@/lib/paymentMethodService';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,13 +43,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 interface PaymentMethod {
   id: string;
-  type: 'card' | 'bank_account';
+  type: 'card' | 'bank_account' | 'digital_wallet';
   last4: string;
   brand?: string;
   expiryMonth?: number;
   expiryYear?: number;
   isDefault: boolean;
   nickname?: string;
+  funding?: string;
+  bankName?: string;
+  bankAccountType?: string;
+  lastUsedAt?: string;
+  createdAt: string;
 }
 
 const PaymentMethods: React.FC = () => {
@@ -58,39 +64,69 @@ const PaymentMethods: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addingMethod, setAddingMethod] = useState(false);
+  const [showBillingDialog, setShowBillingDialog] = useState(false);
+  const [savingBilling, setSavingBilling] = useState(false);
+  const [billingAddress, setBillingAddress] = useState({
+    line1: '',
+    line2: '',
+    city: '',
+    state: '',
+    postal_code: '',
+    country: 'US'
+  });
 
-  // Mock data for demonstration - In real implementation, this would come from your payment provider
+  // Helper function to convert database payment method to component interface
+  const convertDBPaymentMethod = (dbMethod: PaymentMethodDB): PaymentMethod => {
+    return {
+      id: dbMethod.id,
+      type: dbMethod.type,
+      last4: dbMethod.card_last4 || dbMethod.bank_account_last4 || '',
+      brand: dbMethod.card_brand,
+      expiryMonth: dbMethod.card_exp_month,
+      expiryYear: dbMethod.card_exp_year,
+      isDefault: dbMethod.is_default,
+      nickname: dbMethod.nickname,
+      funding: dbMethod.card_funding,
+      bankName: dbMethod.bank_name,
+      bankAccountType: dbMethod.bank_account_type,
+      lastUsedAt: dbMethod.last_used_at,
+      createdAt: dbMethod.created_at
+    };
+  };
+
   useEffect(() => {
     const loadPaymentMethods = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
       try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        setLoading(true);
+        const { data, error } = await paymentMethodService.getUserPaymentMethods();
         
-        // Mock payment methods
-        const mockMethods: PaymentMethod[] = [
-          {
-            id: '1',
-            type: 'card',
-            last4: '4242',
-            brand: 'visa',
-            expiryMonth: 12,
-            expiryYear: 2025,
-            isDefault: true,
-            nickname: 'Personal Card'
-          },
-          {
-            id: '2',
-            type: 'card',
-            last4: '0005',
-            brand: 'mastercard',
-            expiryMonth: 8,
-            expiryYear: 2024,
-            isDefault: false,
-            nickname: 'Business Card'
+        if (error) {
+          console.error('Error loading payment methods:', error);
+          toast({
+            title: "Error",
+            description: error,
+            variant: "destructive"
+          });
+          return;
+        }
+
+        if (data) {
+          const convertedMethods = data.map(convertDBPaymentMethod);
+          setPaymentMethods(convertedMethods);
+          
+          // Load billing address from default payment method if available
+          const defaultMethod = data.find(method => method.is_default);
+          if (defaultMethod && defaultMethod.billing_address) {
+            setBillingAddress(defaultMethod.billing_address);
           }
-        ];
-        
-        setPaymentMethods(mockMethods);
+        } else {
+          setPaymentMethods([]);
+        }
       } catch (error) {
         console.error('Error loading payment methods:', error);
         toast({
@@ -103,23 +139,35 @@ const PaymentMethods: React.FC = () => {
       }
     };
 
-    if (user) {
-      loadPaymentMethods();
-    }
+    loadPaymentMethods();
   }, [user, toast]);
 
   const handleSetDefault = async (id: string) => {
     try {
-      // Update local state
-      setPaymentMethods(prev => prev.map(method => ({
-        ...method,
-        isDefault: method.id === id
-      })));
+      const { success, error } = await paymentMethodService.setDefaultPaymentMethod(id);
+      
+      if (error) {
+        console.error('Error setting default payment method:', error);
+        toast({
+          title: "Error",
+          description: error,
+          variant: "destructive"
+        });
+        return;
+      }
 
-      toast({
-        title: "Success",
-        description: "Default payment method updated",
-      });
+      if (success) {
+        // Update local state
+        setPaymentMethods(prev => prev.map(method => ({
+          ...method,
+          isDefault: method.id === id
+        })));
+
+        toast({
+          title: "Success",
+          description: "Default payment method updated",
+        });
+      }
     } catch (error) {
       console.error('Error setting default payment method:', error);
       toast({
@@ -132,13 +180,27 @@ const PaymentMethods: React.FC = () => {
 
   const handleRemoveMethod = async (id: string) => {
     try {
-      // Remove from local state
-      setPaymentMethods(prev => prev.filter(method => method.id !== id));
+      const { success, error } = await paymentMethodService.removePaymentMethod(id);
+      
+      if (error) {
+        console.error('Error removing payment method:', error);
+        toast({
+          title: "Error",
+          description: error,
+          variant: "destructive"
+        });
+        return;
+      }
 
-      toast({
-        title: "Success",
-        description: "Payment method removed",
-      });
+      if (success) {
+        // Remove from local state
+        setPaymentMethods(prev => prev.filter(method => method.id !== id));
+
+        toast({
+          title: "Success",
+          description: "Payment method removed",
+        });
+      }
     } catch (error) {
       console.error('Error removing payment method:', error);
       toast({
@@ -152,27 +214,17 @@ const PaymentMethods: React.FC = () => {
   const handleAddMethod = async () => {
     setAddingMethod(true);
     try {
-      // Simulate adding a new payment method
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Note: In a real implementation, this would integrate with a payment processor like Stripe
+      // to securely tokenize the card details before storing in the database
+      // For now, we'll show a placeholder implementation
       
-      const newMethod: PaymentMethod = {
-        id: String(Date.now()),
-        type: 'card',
-        last4: '1234',
-        brand: 'visa',
-        expiryMonth: 12,
-        expiryYear: 2026,
-        isDefault: paymentMethods.length === 0,
-        nickname: 'New Card'
-      };
-
-      setPaymentMethods(prev => [...prev, newMethod]);
-      setShowAddDialog(false);
-
       toast({
-        title: "Success",
-        description: "Payment method added successfully",
+        title: "Feature Coming Soon",
+        description: "Payment method integration with Stripe is currently in development. This feature will be available soon.",
+        variant: "default"
       });
+      
+      setShowAddDialog(false);
     } catch (error) {
       console.error('Error adding payment method:', error);
       toast({
@@ -183,6 +235,58 @@ const PaymentMethods: React.FC = () => {
     } finally {
       setAddingMethod(false);
     }
+  };
+
+  const handleSaveBillingAddress = async () => {
+    setSavingBilling(true);
+    try {
+      // Find default payment method to update, or create new one if none exists
+      const defaultMethod = paymentMethods.find(method => method.isDefault);
+      
+      if (defaultMethod) {
+        const { data, error } = await paymentMethodService.updatePaymentMethod(defaultMethod.id, {
+          billing_address: billingAddress
+        });
+        
+        if (error) {
+          console.error('Error updating billing address:', error);
+          toast({
+            title: "Error",
+            description: error,
+            variant: "destructive"
+          });
+          return;
+        }
+
+        if (data) {
+          // Update local state
+          setPaymentMethods(prev => prev.map(method => 
+            method.id === defaultMethod.id 
+              ? { ...method, ...convertDBPaymentMethod(data) }
+              : method
+          ));
+        }
+      }
+      
+      setShowBillingDialog(false);
+      toast({
+        title: "Success",
+        description: "Billing address updated successfully",
+      });
+    } catch (error) {
+      console.error('Error saving billing address:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save billing address",
+        variant: "destructive"
+      });
+    } finally {
+      setSavingBilling(false);
+    }
+  };
+
+  const handleBillingAddressChange = (field: string, value: string) => {
+    setBillingAddress(prev => ({ ...prev, [field]: value }));
   };
 
   const getCardIcon = (brand?: string) => {
@@ -397,8 +501,11 @@ const PaymentMethods: React.FC = () => {
                           <div className="text-sm text-gray-500">
                             {method.nickname && `${method.nickname} • `}
                             {method.expiryMonth && method.expiryYear && 
-                              `Expires ${method.expiryMonth}/${method.expiryYear}`
+                              `Expires ${method.expiryMonth.toString().padStart(2, '0')}/${method.expiryYear}`
                             }
+                            {method.lastUsedAt && (
+                              <span className="ml-2">• Last used {new Date(method.lastUsedAt).toLocaleDateString()}</span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -474,9 +581,24 @@ const PaymentMethods: React.FC = () => {
                   <p className="text-sm text-gray-600 mb-3">
                     All donations are eligible for tax receipts. Receipts will be sent to your email address.
                   </p>
-                  <Button variant="outline" size="sm">
-                    Update Billing Address
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setShowBillingDialog(true)}
+                  >
+                    {billingAddress.line1 ? 'Update' : 'Add'} Billing Address
                   </Button>
+                  {billingAddress.line1 && (
+                    <div className="mt-3 p-3 bg-white border rounded text-sm">
+                      <div className="font-medium text-gray-900">Current Billing Address</div>
+                      <div className="text-gray-600 mt-1">
+                        <div>{billingAddress.line1}</div>
+                        {billingAddress.line2 && <div>{billingAddress.line2}</div>}
+                        <div>{billingAddress.city}, {billingAddress.state} {billingAddress.postal_code}</div>
+                        <div>{billingAddress.country}</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="p-4 bg-yellow-50 rounded-lg">
@@ -488,6 +610,111 @@ const PaymentMethods: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Billing Address Dialog */}
+          <Dialog open={showBillingDialog} onOpenChange={setShowBillingDialog}>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Update Billing Address</DialogTitle>
+                <DialogDescription>
+                  Update your billing address for tax receipts and payment processing
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="address-line1">Address Line 1 *</Label>
+                  <Input
+                    id="address-line1"
+                    placeholder="123 Main Street"
+                    value={billingAddress.line1}
+                    onChange={(e) => handleBillingAddressChange('line1', e.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="address-line2">Address Line 2</Label>
+                  <Input
+                    id="address-line2"
+                    placeholder="Apt 4B, Suite 100 (optional)"
+                    value={billingAddress.line2}
+                    onChange={(e) => handleBillingAddressChange('line2', e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="city">City *</Label>
+                    <Input
+                      id="city"
+                      placeholder="New York"
+                      value={billingAddress.city}
+                      onChange={(e) => handleBillingAddressChange('city', e.target.value)}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="state">State *</Label>
+                    <Input
+                      id="state"
+                      placeholder="NY"
+                      value={billingAddress.state}
+                      onChange={(e) => handleBillingAddressChange('state', e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="postal-code">Postal Code *</Label>
+                    <Input
+                      id="postal-code"
+                      placeholder="10001"
+                      value={billingAddress.postal_code}
+                      onChange={(e) => handleBillingAddressChange('postal_code', e.target.value)}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="country">Country *</Label>
+                    <Select
+                      value={billingAddress.country}
+                      onValueChange={(value) => handleBillingAddressChange('country', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="US">United States</SelectItem>
+                        <SelectItem value="CA">Canada</SelectItem>
+                        <SelectItem value="GB">United Kingdom</SelectItem>
+                        <SelectItem value="AU">Australia</SelectItem>
+                        <SelectItem value="DE">Germany</SelectItem>
+                        <SelectItem value="FR">France</SelectItem>
+                        <SelectItem value="JP">Japan</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowBillingDialog(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleSaveBillingAddress}
+                  disabled={savingBilling || !billingAddress.line1 || !billingAddress.city || !billingAddress.state || !billingAddress.postal_code}
+                >
+                  {savingBilling ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Address'
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>
