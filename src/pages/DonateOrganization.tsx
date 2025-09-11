@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,31 +17,14 @@ import { donationService, DonationFormState, DonationContext } from "../lib/dona
 import { MockPaymentMethod } from "../lib/payment";
 import DonationConfirmation from "../components/DonationConfirmation";
 import { useAuth } from "@/contexts/AuthContext";
-
-// Minimal mock data to render org context
-const organizations = [
-  {
-    slug: "hope-community-center",
-    name: "Hope Community Center",
-    location: "Manila, Philippines",
-    category: "Food Security",
-    verified: true,
-    image: organizationImage,
-  },
-  {
-    slug: "education-bridge-ph",
-    name: "Education Bridge PH",
-    location: "Davao City, Philippines",
-    category: "Education",
-    verified: true,
-    image: organizationImage,
-  },
-];
+import { organizationService, OrganizationWithCampaigns } from "@/lib/organizationService";
 
 const DonateOrganization = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const org = organizations.find((o) => o.slug === slug);
+  const [org, setOrg] = useState<OrganizationWithCampaigns | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [selectedAmount, setSelectedAmount] = useState("");
   const [donationType, setDonationType] = useState("one-time");
@@ -52,10 +35,35 @@ const DonateOrganization = () => {
   const [isLoadingUserData, setIsLoadingUserData] = useState(false);
   const { user } = useAuth();
 
+  const loadOrganization = useCallback(async () => {
+    if (!slug) {
+      setError("Organization slug is required");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { data, error: fetchError } = await organizationService.getOrganizationBySlug(slug);
+      
+      if (fetchError) {
+        setError(fetchError);
+      } else if (!data) {
+        setError("Organization not found");
+      } else {
+        setOrg(data);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load organization");
+    } finally {
+      setLoading(false);
+    }
+  }, [slug]);
+
   useEffect(() => {
     setAvailablePaymentMethods(donationService.getAvailablePaymentMethods());
     initializeFormWithAuth();
-  }, []);
+    loadOrganization();
+  }, [slug, loadOrganization]);
 
   const initializeFormWithAuth = async () => {
     setIsLoadingUserData(true);
@@ -106,7 +114,7 @@ const DonateOrganization = () => {
 
     try {
       const context = {
-        organizationId: org.slug,
+        organizationId: org.id,
         organizationName: org.name
       };
 
@@ -129,7 +137,22 @@ const DonateOrganization = () => {
     setSelectedAmount("");
   };
 
-  if (!org) {
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <span className="ml-2 text-lg">Loading organization...</span>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (error || !org) {
     return (
       <div className="min-h-screen bg-background">
         <Navigation />
@@ -139,7 +162,9 @@ const DonateOrganization = () => {
           </Button>
           <Card className="p-8 text-center">
             <h1 className="text-2xl font-semibold mb-2">Organization Not Found</h1>
-            <p className="text-muted-foreground mb-4">The organization you are trying to donate to does not exist.</p>
+            <p className="text-muted-foreground mb-4">
+              {error || "The organization you are trying to donate to does not exist."}
+            </p>
             <Link to="/organizations">
               <Button variant="default">Browse Organizations</Button>
             </Link>
@@ -160,11 +185,15 @@ const DonateOrganization = () => {
               <ArrowLeft className="w-4 h-4 mr-2" /> Back
             </Button>
             <div className="flex items-center gap-4">
-              <img src={org.image} alt={org.name} className="w-16 h-16 rounded-md object-cover" />
+              <img 
+                src={org.banner_url || org.logo_url || organizationImage} 
+                alt={org.name} 
+                className="w-16 h-16 rounded-md object-cover" 
+              />
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-2xl font-bold text-foreground">Donate to {org.name}</h1>
-                  {org.verified && (
+                  {org.verification_status === 'verified' && (
                     <Badge variant="default" className="bg-success text-success-foreground">
                       <Verified className="w-3 h-3 mr-1" /> Verified
                     </Badge>
@@ -172,7 +201,8 @@ const DonateOrganization = () => {
                   <Badge variant="outline" className="bg-white/90 text-foreground">{org.category}</Badge>
                 </div>
                 <div className="text-sm text-muted-foreground flex items-center mt-1">
-                  <MapPin className="w-3 h-3 mr-1" /> {org.location}
+                  <MapPin className="w-3 h-3 mr-1" /> 
+                  {[org.city, org.state, org.country].filter(Boolean).join(', ') || 'Location not specified'}
                 </div>
               </div>
             </div>
