@@ -489,6 +489,7 @@ const Auth = () => {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="individual">Individual Donor</SelectItem>
+                          <SelectItem value="nonprofit">Nonprofit Organization</SelectItem>
                         </SelectContent>
                       </Select>
                       {signUpErrors.userType && (
@@ -496,23 +497,6 @@ const Auth = () => {
                       )}
                     </div>
                     
-                    <div className="text-center">
-                      <p className="text-sm text-muted-foreground mb-2">or</p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => {
-                          setSignUpForm(prev => ({ ...prev, userType: 'nonprofit' }));
-                          if (signUpErrors.userType) {
-                            setSignUpErrors(prev => ({ ...prev, userType: undefined }));
-                          }
-                        }}
-                        disabled={loading}
-                      >
-                        Sign up as Organization
-                      </Button>
-                    </div>
                   </div>
                   
                   {signUpForm.userType && (

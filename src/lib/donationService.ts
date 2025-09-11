@@ -419,7 +419,7 @@ class DonationService {
 
       // Get current session
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.email) {
+      if (!session?.user?.id) {
         return {
           donations: [],
           total: 0,
@@ -427,11 +427,11 @@ class DonationService {
         };
       }
 
-      // Fetch donations with pagination
+      // Fetch donations with pagination using user_id for better security
       const { data: donations, error: donationsError, count } = await supabase
         .from('donations')
         .select('*', { count: 'exact' })
-        .eq('donor_email', session.user.email)
+        .eq('user_id', session.user.id)
         .eq('payment_status', 'succeeded')
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
@@ -483,7 +483,7 @@ class DonationService {
 
       // Get current session
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.email) {
+      if (!session?.user?.id) {
         return {
           totalDonated: 0,
           donationCount: 0,
@@ -492,11 +492,11 @@ class DonationService {
         };
       }
 
-      // Fetch donation statistics
+      // Fetch donation statistics using user_id for better security
       const { data: donations, error } = await supabase
         .from('donations')
         .select('amount, is_recurring')
-        .eq('donor_email', session.user.email)
+        .eq('user_id', session.user.id)
         .eq('payment_status', 'succeeded');
 
       if (error) {

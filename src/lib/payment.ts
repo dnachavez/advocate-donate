@@ -272,24 +272,35 @@ class MockPaymentService {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
+      // Get current user data for proper linking
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session?.user) {
+        throw new Error('User authentication required to save donation');
+      }
+
       // Map the donation data to match the database schema
       const donationRecord: TablesInsert<'donations'> = {
         amount: donationData.amount,
-        currency: donationData.currency.toLowerCase(),
+        currency: donationData.currency.toUpperCase(), // Store currency in uppercase
         donor_email: donationData.donorEmail,
         donor_name: donationData.donorName,
         donor_phone: null,
         target_type: donationData.campaignId ? 'campaign' : (donationData.organizationId ? 'organization' : 'general'),
         target_name: targetName || (donationData.campaignId ? 'Campaign Donation' : (donationData.organizationId ? 'Organization Donation' : 'General Fund')),
         target_id: donationData.campaignId || donationData.organizationId || null,
-        payment_intent_id: paymentResult.paymentIntent?.id || null,
+        payment_intent_id: paymentResult.paymentIntent?.id || `mock_${Date.now()}`,
         payment_method_id: null,
         payment_status: 'succeeded',
         is_recurring: donationData.isRecurring || false,
         frequency: donationData.frequency || null,
         is_anonymous: false,
         message: donationData.message || null,
-        processed_at: new Date().toISOString()
+        processed_at: new Date().toISOString(),
+        // Link donation to the authenticated user
+        user_id: session.user.id,
+        // Link to specific organization/campaign if provided
+        organization_id: donationData.organizationId || null,
+        campaign_id: donationData.campaignId || null
       };
 
       const { data, error } = await supabase
