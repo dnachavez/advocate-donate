@@ -90,7 +90,7 @@ export const adminService = {
       const { count: pendingOrganizations } = await supabase
         .from('organizations')
         .select('*', { count: 'exact', head: true })
-        .eq('approval_status', 'pending');
+        .eq('verification_status', 'pending');
 
       // Get campaign count
       const { count: totalCampaigns } = await supabase
@@ -149,15 +149,14 @@ export const adminService = {
           *,
           user_profiles:user_id (
             id,
-            full_name,
-            email
+            full_name
           )
         `, { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
       if (statusFilter && statusFilter !== 'all') {
-        query = query.eq('approval_status', statusFilter);
+        query = query.eq('verification_status', statusFilter);
       }
 
       const { data, error, count } = await query;
@@ -193,9 +192,8 @@ export const adminService = {
       const { error } = await supabase
         .from('organizations')
         .update({
-          approval_status: status,
-          approval_notes: notes,
-          approved_at: status === 'approved' ? new Date().toISOString() : null
+          verification_status: status === 'approved' ? 'verified' : status === 'rejected' ? 'rejected' : 'suspended',
+          verified_at: status === 'approved' ? new Date().toISOString() : null
         })
         .eq('id', organizationId);
 
@@ -208,7 +206,7 @@ export const adminService = {
         action: `update_organization_${status}`,
         target_type: 'organization',
         target_id: organizationId,
-        new_values: { approval_status: status, notes }
+        new_values: { verification_status: status === 'approved' ? 'verified' : status === 'rejected' ? 'rejected' : 'suspended' }
       });
 
       return { error: null };
@@ -241,7 +239,7 @@ export const adminService = {
           *,
           organizations (
             name,
-            approval_status
+            verification_status
           )
         `, { count: 'exact' })
         .order('created_at', { ascending: false })
