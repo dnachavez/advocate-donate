@@ -9,11 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Building2, CheckCircle, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
+import { Building2, CheckCircle, ArrowLeft, Loader2, AlertCircle, Upload, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
-import { userService } from '@/lib/userService';
+import { userService, UserProfileWithOrganization } from '@/lib/userService';
 import { organizationService } from '@/lib/organizationService';
+import { uploadImage, validateImageFile, createImagePreview, revokeImagePreview } from '@/lib/imageUpload';
 import { toast } from '@/hooks/use-toast';
 
 interface OrganizationSetupForm {
@@ -32,6 +33,7 @@ interface OrganizationSetupForm {
   registration_number: string;
   tax_id: string;
   founded_year: string;
+  logo_url: string;
 }
 
 const organizationCategories = [
@@ -56,6 +58,7 @@ const OrganizationSetup: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfileWithOrganization | null>(null);
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<OrganizationSetupForm>({
     name: '',
@@ -72,8 +75,14 @@ const OrganizationSetup: React.FC = () => {
     subcategories: '',
     registration_number: '',
     tax_id: '',
-    founded_year: ''
+    founded_year: '',
+    logo_url: ''
   });
+
+  // Image upload state
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string>('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [errors, setErrors] = useState<Partial<OrganizationSetupForm>>({});
 
   useEffect(() => {
@@ -96,20 +105,37 @@ const OrganizationSetup: React.FC = () => {
           return;
         }
 
-        if (profile.organization) {
-          // Organization already exists, redirect to dashboard
-          navigate('/dashboard');
-          return;
-        }
+        setUserProfile(profile);
 
-        // Pre-populate form with existing profile data
+        // Pre-populate form with existing data (whether from profile or organization)
+        const org = profile.organization;
+        // Get phone from organization, or fallback to user metadata
+        const userMetadata = user?.user_metadata || {};
+        
         setFormData(prev => ({
           ...prev,
-          name: profile.organization_name || '',
-          email: user?.email || '',
-          registration_number: profile.registration_number || '',
-          website: profile.website || '',
+          name: org?.name || profile.organization_name || '',
+          description: org?.description || '',
+          mission_statement: org?.mission_statement || '',
+          email: org?.email || user?.email || '',
+          phone: org?.phone || (userMetadata.phone_number as string) || '',
+          website: org?.website || profile.website || (userMetadata.website as string) || '',
+          address: org?.address || '',
+          city: org?.city || '',
+          state: org?.state || '',
+          postal_code: org?.postal_code || '',
+          category: org?.category || '',
+          subcategories: org?.subcategories ? org.subcategories.join(', ') : '',
+          registration_number: org?.registration_number || profile.registration_number || '',
+          tax_id: org?.tax_id || '',
+          founded_year: org?.founded_year ? org.founded_year.toString() : '',
+          logo_url: org?.logo_url || ''
         }));
+        
+        // Set logo preview if organization has existing logo
+        if (org?.logo_url) {
+          setLogoPreview(org.logo_url);
+        }
 
       } catch (err) {
         console.error('Error checking user access:', err);
@@ -121,6 +147,58 @@ const OrganizationSetup: React.FC = () => {
 
     checkUserAccess();
   }, [user, navigate]);
+
+  // Handle logo file selection
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validation = validateImageFile(file);
+    if (!validation.isValid) {
+      toast({
+        title: 'Invalid file',
+        description: validation.error,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLogoFile(file);
+    
+    // Clean up previous preview
+    if (logoPreview && !formData.logo_url) {
+      revokeImagePreview(logoPreview);
+    }
+    
+    const preview = createImagePreview(file);
+    setLogoPreview(preview);
+  };
+
+  // Remove logo
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    if (logoPreview && !formData.logo_url) {
+      revokeImagePreview(logoPreview);
+    }
+    setLogoPreview('');
+    setFormData(prev => ({ ...prev, logo_url: '' }));
+  };
+
+  // Upload logo to blob storage
+  const uploadLogo = async (): Promise<string> => {
+    if (!logoFile) return formData.logo_url;
+    
+    setUploadingLogo(true);
+    try {
+      const result = await uploadImage(logoFile);
+      if (result.error) {
+        throw new Error(result.error);
+      }
+      return result.url;
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   const validateStep = (stepNumber: number): boolean => {
     const newErrors: Partial<OrganizationSetupForm> = {};
@@ -166,22 +244,14 @@ const OrganizationSetup: React.FC = () => {
     setError(null);
 
     try {
-      // Generate slug from organization name
-      const baseSlug = organizationService.generateSlug(formData.name);
-      
-      // Check if slug is available
-      const { available, error: slugError } = await organizationService.isSlugAvailable(baseSlug);
-      
-      if (slugError) {
-        throw new Error('Failed to validate organization name');
-      }
+      // Check if organization actually exists in database
+      const { data: existingOrg } = await organizationService.getCurrentUserOrganization();
+      const isUpdating = !!existingOrg;
 
-      const finalSlug = available ? baseSlug : `${baseSlug}-${Date.now()}`;
+      // Upload logo if a new file was selected
+      const logoUrl = await uploadLogo();
 
-      // Create organization
       const organizationData = {
-        user_id: user!.id,
-        slug: finalSlug,
         name: formData.name.trim(),
         description: formData.description.trim(),
         mission_statement: formData.mission_statement.trim(),
@@ -197,30 +267,53 @@ const OrganizationSetup: React.FC = () => {
         registration_number: formData.registration_number.trim(),
         tax_id: formData.tax_id.trim() || null,
         founded_year: formData.founded_year ? Number(formData.founded_year) : null,
-        country: 'Philippines'
+        logo_url: logoUrl || null,
       };
 
-      const { data, error: createError } = await organizationService.createOrganization(organizationData);
+      let result;
+      if (isUpdating) {
+        // Update existing organization
+        result = await organizationService.updateOrganization(organizationData);
+      } else {
+        // Create new organization with additional fields
+        const baseSlug = organizationService.generateSlug(formData.name);
+        const { available, error: slugError } = await organizationService.isSlugAvailable(baseSlug);
+        
+        if (slugError) {
+          throw new Error('Failed to validate organization name');
+        }
 
-      if (createError) {
-        throw new Error(createError);
+        const finalSlug = available ? baseSlug : `${baseSlug}-${Date.now()}`;
+        
+        result = await organizationService.createOrganization({
+          user_id: user!.id,
+          slug: finalSlug,
+          country: 'Philippines',
+          ...organizationData
+        });
       }
 
-      if (!data) {
-        throw new Error('Failed to create organization');
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      if (!result.data) {
+        throw new Error(isUpdating ? 'Failed to update organization' : 'Failed to create organization');
       }
 
       toast({
-        title: 'Organization Created Successfully!',
-        description: 'Your organization profile has been created. It will be reviewed for verification.',
+        title: isUpdating ? 'Organization Updated Successfully!' : 'Organization Created Successfully!',
+        description: isUpdating 
+          ? 'Your organization profile has been updated.' 
+          : 'Your organization profile has been created. It will be reviewed for verification.',
       });
 
       // Redirect to dashboard
       navigate('/dashboard');
 
     } catch (err) {
-      console.error('Error creating organization:', err);
-      setError(err instanceof Error ? err.message : 'Failed to create organization');
+      console.error('Error saving organization:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save organization');
     } finally {
       setLoading(false);
     }
@@ -324,6 +417,56 @@ const OrganizationSetup: React.FC = () => {
                 placeholder="Your organization's mission and goals"
                 rows={3}
               />
+            </div>
+
+            {/* Logo Upload Section */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Organization Logo</label>
+              <div className="space-y-4">
+                {logoPreview ? (
+                  <div className="relative inline-block">
+                    <img
+                      src={logoPreview}
+                      alt="Organization logo preview"
+                      className="w-32 h-32 object-cover rounded-lg border border-gray-300"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="absolute -top-2 -right-2 w-6 h-6 rounded-full p-0"
+                      onClick={handleRemoveLogo}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600 mb-2">Upload organization logo</p>
+                    <p className="text-xs text-gray-500">PNG, JPG, GIF up to 2MB</p>
+                  </div>
+                )}
+                
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoChange}
+                  className="hidden"
+                  id="logo-upload"
+                />
+                
+                {!logoPreview && (
+                  <label htmlFor="logo-upload">
+                    <Button type="button" variant="outline" className="w-full" asChild>
+                      <span className="cursor-pointer">
+                        <Upload className="w-4 h-4 mr-2" />
+                        Choose Logo
+                      </span>
+                    </Button>
+                  </label>
+                )}
+              </div>
             </div>
           </div>
         );
@@ -488,9 +631,14 @@ const OrganizationSetup: React.FC = () => {
               </div>
               <span className="text-xl font-bold text-primary">Organization Setup</span>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Complete Your Organization Profile</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              {userProfile?.organization ? 'Edit Your Organization Profile' : 'Complete Your Organization Profile'}
+            </h1>
             <p className="text-gray-600">
-              Set up your organization to start creating campaigns and receiving donations
+              {userProfile?.organization 
+                ? 'Update your organization information and settings'
+                : 'Set up your organization to start creating campaigns and receiving donations'
+              }
             </p>
           </div>
 
@@ -561,10 +709,10 @@ const OrganizationSetup: React.FC = () => {
                       {loading ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Creating Organization...
+                          {formData.name && userProfile?.organization ? 'Updating...' : 'Creating Organization...'}
                         </>
                       ) : (
-                        'Complete Setup'
+                        formData.name && userProfile?.organization ? 'Update Organization' : 'Complete Setup'
                       )}
                     </Button>
                   )}

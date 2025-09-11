@@ -207,8 +207,8 @@ const OrganizationDashboard: React.FC = () => {
               <Building2 className="h-4 w-4 text-gray-500" />
               <div>
                 <p className="text-sm font-medium text-gray-900">{organization?.name}</p>
-                <Badge variant={organization?.verification_status === 'verified' ? 'default' : 'destructive'}>
-                  {organization?.verification_status || 'Unknown'}
+                <Badge variant={organization?.verification_status === 'verified' ? 'default' : 'secondary'}>
+                  {organization?.verification_status === 'verified' ? 'Verified' : 'Pending Verification'}
                 </Badge>
               </div>
             </div>
@@ -216,7 +216,7 @@ const OrganizationDashboard: React.FC = () => {
             <div className="flex items-center gap-3">
               <Mail className="h-4 w-4 text-gray-500" />
               <div>
-                <p className="text-sm font-medium text-gray-900">{organization?.email}</p>
+                <p className="text-sm font-medium text-gray-900">{organization?.email || 'Not provided'}</p>
                 <p className="text-sm text-gray-600">Organization Email</p>
               </div>
             </div>
@@ -224,7 +224,7 @@ const OrganizationDashboard: React.FC = () => {
             <div className="flex items-center gap-3">
               <Target className="h-4 w-4 text-gray-500" />
               <div>
-                <p className="text-sm font-medium text-gray-900">{organization?.category}</p>
+                <p className="text-sm font-medium text-gray-900">{organization?.category || 'Not specified'}</p>
                 <p className="text-sm text-gray-600">Category</p>
               </div>
             </div>
@@ -372,13 +372,21 @@ const OrganizationDashboard: React.FC = () => {
               </Button>
             </Link>
             
-            <Button variant="outline" className="w-full h-20 flex flex-col gap-2">
+            <Button 
+              variant="outline" 
+              className="w-full h-20 flex flex-col gap-2"
+              onClick={() => navigate('/view-donors')}
+            >
               <Users className="h-5 w-5" />
               <span className="font-medium">View Donors</span>
               <span className="text-xs text-gray-500">See who supports you</span>
             </Button>
             
-            <Button variant="outline" className="w-full h-20 flex flex-col gap-2">
+            <Button 
+              variant="outline" 
+              className="w-full h-20 flex flex-col gap-2"
+              onClick={() => navigate('/organization-setup')}
+            >
               <Settings className="h-5 w-5" />
               <span className="font-medium">Organization Settings</span>
               <span className="text-xs text-gray-500">Manage your profile</span>

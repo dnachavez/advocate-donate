@@ -44,6 +44,7 @@ import EditProfile from "./pages/EditProfile";
 import PrivacySettings from "./pages/PrivacySettings";
 import PaymentMethods from "./pages/PaymentMethods";
 import NotificationSettings from "./pages/NotificationSettings";
+import ViewDonors from "./pages/ViewDonors";
 
 const queryClient = new QueryClient();
 
@@ -109,6 +110,11 @@ const App = () => (
             <Route path="/notification-settings" element={
               <RequireAuth>
                 <NotificationSettings />
+              </RequireAuth>
+            } />
+            <Route path="/view-donors" element={
+              <RequireAuth>
+                <ViewDonors />
               </RequireAuth>
             } />
           <Route path="/donate" element={

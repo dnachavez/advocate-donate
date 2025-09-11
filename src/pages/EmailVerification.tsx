@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, AlertCircle, Loader2, Mail, ArrowLeft } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Link } from 'react-router-dom';
+import { userService } from '@/lib/userService';
 
 const EmailVerification = () => {
   const navigate = useNavigate();
@@ -54,9 +55,10 @@ const EmailVerification = () => {
       // No valid parameters, wait for Supabase auth state change
       handleAuthStateChange();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, type]);
 
-  const handleHashError = (hashParams: any) => {
+  const handleHashError = (hashParams: { error?: string; error_code?: string; error_description?: string }) => {
     setLoading(false);
     
     if (hashParams.error_code === 'otp_expired' || hashParams.error_description?.includes('expired')) {
@@ -92,10 +94,11 @@ const EmailVerification = () => {
             description: 'Your account has been activated. Welcome!',
           });
           
-          // Redirect to dashboard after success
+          // Check if user needs organization setup
+          const redirectPath = await getRedirectPath();
           setTimeout(() => {
-            navigate('/dashboard');
-          }, 2000);
+            navigate(redirectPath);
+          }, 3000); // Extended to 3 seconds to allow organization creation toast to show
         } else {
           setVerificationStatus('error');
           setErrorMessage('Session not found. Please try signing in.');
@@ -125,9 +128,10 @@ const EmailVerification = () => {
               description: 'Your account has been activated. Welcome!',
             });
             
+            const redirectPath = await getRedirectPath();
             setTimeout(() => {
-              navigate('/dashboard');
-            }, 2000);
+              navigate(redirectPath);
+            }, 3000); // Extended to 3 seconds to allow organization creation toast to show
           } else if (event === 'SIGNED_OUT') {
             setLoading(false);
             setVerificationStatus('error');
@@ -194,9 +198,10 @@ const EmailVerification = () => {
           description: 'Your account has been activated. You can now sign in.',
         });
         
-        // Redirect to sign-in page after a delay
+        // Check if user needs organization setup
+        const redirectPath = await getRedirectPath();
         setTimeout(() => {
-          navigate('/auth?tab=signin');
+          navigate(redirectPath);
         }, 3000);
       }
     } catch (error) {
@@ -245,6 +250,54 @@ const EmailVerification = () => {
     }
   };
   
+  // Helper function to create organization from metadata and determine redirect path
+  const getRedirectPath = async () => {
+    try {
+      // First try to create organization from metadata if user is nonprofit
+      await createOrganizationFromMetadata();
+      
+      const { data: profile, error } = await userService.getCurrentUserProfile();
+      
+      if (error || !profile) {
+        return '/dashboard';
+      }
+      
+      // If user is nonprofit and doesn't have organization setup, redirect to setup
+      if (profile.user_type === 'nonprofit' && !profile.organization) {
+        return '/organization-setup';
+      }
+      
+      return '/dashboard';
+    } catch (error) {
+      console.error('Error checking user profile:', error);
+      return '/dashboard';
+    }
+  };
+
+  // Helper function to create organization from user metadata
+  const createOrganizationFromMetadata = async () => {
+    try {
+      const { data: organization, error } = await userService.createOrganizationFromMetadata();
+      
+      if (error) {
+        console.log('Could not create organization from metadata:', error);
+        // Don't throw error - user can still set up organization manually
+        return;
+      }
+      
+      if (organization) {
+        console.log('Organization created from metadata:', organization.name);
+        toast({
+          title: 'Organization Profile Created',
+          description: `Welcome ${organization.name}! Your organization profile has been set up.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error creating organization from metadata:', error);
+      // Don't throw error - user can still set up organization manually
+    }
+  };
+
   const resendVerificationEmail = async () => {
     if (resendCooldown > 0) return;
     
@@ -317,8 +370,11 @@ const EmailVerification = () => {
             <p className="text-muted-foreground mb-6">
               Your email has been confirmed. You will be redirected to sign in shortly.
             </p>
-            <Button onClick={() => navigate('/auth?tab=signin')} className="w-full">
-              Continue to Sign In
+            <Button onClick={async () => {
+              const redirectPath = await getRedirectPath();
+              navigate(redirectPath);
+            }} className="w-full">
+              Continue to Dashboard
             </Button>
           </div>
         );

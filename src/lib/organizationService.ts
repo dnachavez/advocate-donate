@@ -26,7 +26,7 @@ export const organizationService = {
         .from('organizations')
         .select('*', { count: 'exact' })
         .eq('is_active', true)
-        .eq('verification_status', 'verified')
+        .in('verification_status', ['verified', 'pending'])
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -150,6 +150,21 @@ export const organizationService = {
       
       if (authError || !user) {
         return { data: null, error: 'User not authenticated' };
+      }
+
+      // First check if organization exists
+      const { data: existingOrg, error: checkError } = await supabase
+        .from('organizations')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (checkError) {
+        return { data: null, error: checkError.message };
+      }
+
+      if (!existingOrg) {
+        return { data: null, error: 'No organization found to update. Please create an organization first.' };
       }
 
       const { data, error } = await supabase

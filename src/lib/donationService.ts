@@ -461,6 +461,314 @@ class DonationService {
   }
 
   /**
+   * Get donations received by an organization (both direct and campaign donations)
+   */
+  async getOrganizationReceivedDonations(
+    organizationId: string,
+    limit: number = 50, 
+    offset: number = 0
+  ): Promise<{
+    donations: DonationHistory[];
+    total: number;
+    error?: string;
+  }> {
+    try {
+      // Check if user is authenticated
+      const isAuth = await isAuthenticated();
+      if (!isAuth) {
+        return {
+          donations: [],
+          total: 0,
+          error: 'You must be signed in to view donations.'
+        };
+      }
+
+      // Get current session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        return {
+          donations: [],
+          total: 0,
+          error: 'Unable to verify your identity. Please sign in again.'
+        };
+      }
+
+      // First, get organization details to get the slug
+      console.log('DEBUG SERVICE: Fetching org slug for ID:', organizationId);
+      const { data: organization, error: orgError } = await supabase
+        .from('organizations')
+        .select('slug')
+        .eq('id', organizationId)
+        .single();
+
+      console.log('DEBUG SERVICE: Organization query result:', { organization, orgError });
+
+      if (orgError) {
+        console.error('Error fetching organization:', orgError);
+        return {
+          donations: [],
+          total: 0,
+          error: 'Failed to load organization details: ' + orgError.message
+        };
+      }
+
+      // Get all campaigns belonging to this organization
+      const { data: campaigns, error: campaignError } = await supabase
+        .from('campaigns')
+        .select('id, slug, title')
+        .eq('organization_id', organizationId);
+
+      if (campaignError) {
+        console.error('Error fetching organization campaigns:', campaignError);
+        return {
+          donations: [],
+          total: 0,
+          error: 'Failed to load organization campaigns.'
+        };
+      }
+
+      const campaignIds = campaigns?.map(c => c.id) || [];
+      const organizationSlug = organization?.slug;
+
+      console.log('DEBUG SERVICE: Campaign IDs:', campaignIds);
+      console.log('DEBUG SERVICE: Organization slug:', organizationSlug);
+
+      // Try multiple approaches to find donations
+      let allDonations: DonationHistory[] = [];
+      let totalCount = 0;
+      
+      // First, try with organization slug if it exists
+      if (organizationSlug) {
+        console.log('DEBUG SERVICE: Trying with organization slug:', organizationSlug);
+        
+        const orgQuery = supabase
+          .from('donations')
+          .select('*', { count: 'exact' })
+          .eq('payment_status', 'succeeded')
+          .eq('target_type', 'organization')
+          .eq('target_id', organizationSlug)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + limit - 1);
+          
+        const { data: orgDonations, count: orgCount } = await orgQuery;
+        console.log('DEBUG SERVICE: Org donations result:', { orgDonations, orgCount });
+        
+        if (orgDonations) {
+          allDonations = [...allDonations, ...orgDonations];
+          totalCount += orgCount || 0;
+        }
+      }
+      
+      // Then try with campaign IDs
+      if (campaignIds.length > 0) {
+        console.log('DEBUG SERVICE: Trying with campaign IDs:', campaignIds);
+        
+        const campaignQuery = supabase
+          .from('donations')
+          .select('*', { count: 'exact' })
+          .eq('payment_status', 'succeeded')
+          .eq('target_type', 'campaign')
+          .in('target_id', campaignIds.map(id => id.toString()))
+          .order('created_at', { ascending: false })
+          .range(offset, offset + limit - 1);
+          
+        const { data: campaignDonations, count: campaignCount } = await campaignQuery;
+        console.log('DEBUG SERVICE: Campaign donations result:', { campaignDonations, campaignCount });
+        
+        if (campaignDonations) {
+          allDonations = [...allDonations, ...campaignDonations];
+          totalCount += campaignCount || 0;
+        }
+      }
+      
+      // If no donations found, try a broader search to see if there are ANY donations for debugging
+      if (allDonations.length === 0) {
+        console.log('DEBUG SERVICE: No donations found, trying broader search...');
+        const { data: sampleDonations } = await supabase
+          .from('donations')
+          .select('target_type, target_id, target_name')
+          .eq('payment_status', 'succeeded')
+          .limit(10);
+        console.log('DEBUG SERVICE: Sample donations in database:', sampleDonations);
+        
+        // Also check if the organization actually exists
+        const { data: orgExists } = await supabase
+          .from('organizations')
+          .select('id, slug, name')
+          .eq('id', organizationId)
+          .single();
+        console.log('DEBUG SERVICE: Organization exists check:', orgExists);
+      }
+
+      console.log('DEBUG SERVICE: Final result - donations:', allDonations.length, 'total:', totalCount);
+
+      return {
+        donations: allDonations || [],
+        total: totalCount || 0,
+        error: undefined
+      };
+    } catch (error) {
+      console.error('Error in getOrganizationReceivedDonations:', error);
+      return {
+        donations: [],
+        total: 0,
+        error: 'An unexpected error occurred while loading donations.'
+      };
+    }
+  }
+
+  /**
+   * Get donation statistics for organization (donations received)
+   */
+  async getOrganizationDonationStats(
+    organizationId: string
+  ): Promise<{
+    totalReceived: number;
+    donationCount: number;
+    recurringDonations: number;
+    campaignDonations: number;
+    directDonations: number;
+    error?: string;
+  }> {
+    try {
+      // Check if user is authenticated
+      const isAuth = await isAuthenticated();
+      if (!isAuth) {
+        return {
+          totalReceived: 0,
+          donationCount: 0,
+          recurringDonations: 0,
+          campaignDonations: 0,
+          directDonations: 0,
+          error: 'You must be signed in to view donation statistics.'
+        };
+      }
+
+      // Get current session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        return {
+          totalReceived: 0,
+          donationCount: 0,
+          recurringDonations: 0,
+          campaignDonations: 0,
+          directDonations: 0,
+          error: 'Unable to verify your identity. Please sign in again.'
+        };
+      }
+
+      // First, get organization details to get the slug
+      console.log('DEBUG STATS: Fetching org slug for ID:', organizationId);
+      const { data: organization, error: orgError } = await supabase
+        .from('organizations')
+        .select('slug')
+        .eq('id', organizationId)
+        .single();
+
+      console.log('DEBUG STATS: Organization query result:', { organization, orgError });
+
+      if (orgError) {
+        console.error('Error fetching organization:', orgError);
+        return {
+          totalReceived: 0,
+          donationCount: 0,
+          recurringDonations: 0,
+          campaignDonations: 0,
+          directDonations: 0,
+          error: 'Failed to load organization details: ' + orgError.message
+        };
+      }
+
+      // Get campaigns for this organization
+      const { data: campaigns, error: campaignError } = await supabase
+        .from('campaigns')
+        .select('id')
+        .eq('organization_id', organizationId);
+
+      if (campaignError) {
+        console.error('Error fetching organization campaigns:', campaignError);
+        return {
+          totalReceived: 0,
+          donationCount: 0,
+          recurringDonations: 0,
+          campaignDonations: 0,
+          directDonations: 0,
+          error: 'Failed to load organization campaigns.'
+        };
+      }
+
+      const campaignIds = campaigns?.map(c => c.id) || [];
+      const organizationSlug = organization?.slug;
+
+      console.log('DEBUG STATS: Campaign IDs:', campaignIds);
+      console.log('DEBUG STATS: Organization slug:', organizationSlug);
+
+      // Try multiple approaches to gather statistics
+      let allDonations: Array<{amount: number, target_type: string, target_id: string}> = [];
+      
+      // First, get organization donations
+      if (organizationSlug) {
+        console.log('DEBUG STATS: Querying organization donations for slug:', organizationSlug);
+        const { data: orgDonations } = await supabase
+          .from('donations')
+          .select('amount, target_type, target_id')
+          .eq('payment_status', 'succeeded')
+          .eq('target_type', 'organization')
+          .eq('target_id', organizationSlug);
+        
+        console.log('DEBUG STATS: Organization donations found:', orgDonations?.length || 0);
+        if (orgDonations) {
+          allDonations = [...allDonations, ...orgDonations];
+        }
+      }
+      
+      // Then get campaign donations
+      if (campaignIds.length > 0) {
+        console.log('DEBUG STATS: Querying campaign donations for IDs:', campaignIds);
+        const { data: campaignDonations } = await supabase
+          .from('donations')
+          .select('amount, target_type, target_id')
+          .eq('payment_status', 'succeeded')
+          .eq('target_type', 'campaign')
+          .in('target_id', campaignIds.map(id => id.toString()));
+        
+        console.log('DEBUG STATS: Campaign donations found:', campaignDonations?.length || 0);
+        if (campaignDonations) {
+          allDonations = [...allDonations, ...campaignDonations];
+        }
+      }
+
+      console.log('DEBUG STATS: Total donations for processing:', allDonations.length);
+
+      const totalReceived = allDonations?.reduce((sum, donation) => sum + Number(donation.amount), 0) || 0;
+      const donationCount = allDonations?.length || 0;
+      // Note: Cannot check for recurring donations without subscription info in current schema
+      const recurringDonations = 0;
+      const campaignDonations = allDonations?.filter(d => d.target_type === 'campaign').length || 0;
+      const directDonations = allDonations?.filter(d => d.target_type === 'organization').length || 0;
+
+      return {
+        totalReceived,
+        donationCount,
+        recurringDonations,
+        campaignDonations,
+        directDonations,
+        error: undefined
+      };
+    } catch (error) {
+      console.error('Error in getOrganizationDonationStats:', error);
+      return {
+        totalReceived: 0,
+        donationCount: 0,
+        recurringDonations: 0,
+        campaignDonations: 0,
+        directDonations: 0,
+        error: 'An unexpected error occurred while loading statistics.'
+      };
+    }
+  }
+
+  /**
    * Get donation statistics for user
    */
   async getUserDonationStats(): Promise<{
