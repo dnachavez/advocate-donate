@@ -76,7 +76,7 @@ DROP POLICY IF EXISTS "Organizations are viewable by everyone" ON organizations;
 CREATE POLICY "Organizations viewable by everyone or admin management" 
 ON organizations FOR SELECT 
 USING (
-    approval_status = 'approved' OR
+    verification_status = 'verified' OR
     user_id = auth.uid() OR
     EXISTS (
         SELECT 1 FROM user_profiles 
@@ -105,7 +105,7 @@ USING (
     EXISTS (
         SELECT 1 FROM organizations 
         WHERE id = campaigns.organization_id 
-        AND approval_status = 'approved'
+        AND verification_status = 'verified'
     ) OR
     EXISTS (
         SELECT 1 FROM organizations 

@@ -5,7 +5,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create donations table
 CREATE TABLE donations (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     amount DECIMAL(10,2) NOT NULL CHECK (amount > 0),
     currency VARCHAR(3) NOT NULL DEFAULT 'USD',
     donor_name VARCHAR(255) NOT NULL,
@@ -34,7 +34,7 @@ CREATE TABLE donations (
 
 -- Create subscriptions table for recurring donations
 CREATE TABLE subscriptions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     donation_id UUID NOT NULL REFERENCES donations(id) ON DELETE CASCADE,
     subscription_id VARCHAR(255) NOT NULL UNIQUE, -- External subscription ID from payment provider
     status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'canceled', 'past_due', 'paused')),
@@ -60,7 +60,7 @@ CREATE TABLE subscriptions (
 
 -- Create donation_receipts table for tax receipts
 CREATE TABLE donation_receipts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     donation_id UUID NOT NULL REFERENCES donations(id) ON DELETE CASCADE,
     receipt_number VARCHAR(50) NOT NULL UNIQUE,
     receipt_url TEXT,
