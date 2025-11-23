@@ -21,7 +21,7 @@ const Navigation = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const { user, isAuthenticated, signOut, loading } = useAuth();
   const navigate = useNavigate();
-  
+
   // Gamification hooks
   const { achievement, isLoading: achievementLoading } = useAchievement();
   const { progress, isLoading: progressLoading } = useTierProgress();
@@ -51,14 +51,14 @@ const Navigation = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <div className="flex items-center space-x-2">
+          <Link to="/" className="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity">
             <img
               src="/logo-transparent.png"
               alt="Advocate&Donate logo"
               className="w-8 h-8 rounded-lg object-contain"
             />
             <span className="text-xl font-bold text-foreground">Advocate&Donate</span>
-          </div>
+          </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
@@ -78,7 +78,7 @@ const Navigation = () => {
             <Button variant="ghost" size="icon">
               <Search className="w-4 h-4" />
             </Button>
-            
+
             {loading ? (
               <div className="flex items-center space-x-2">
                 <div className="w-6 h-6 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
@@ -98,11 +98,11 @@ const Navigation = () => {
                   size="sm"
                   onClick={() => navigate('/achievements')}
                 />
-                
+
                 <Button asChild variant="donate" size="sm">
                   <Link to="/donate">Donate Now</Link>
                 </Button>
-                
+
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="flex items-center gap-2">
@@ -149,7 +149,7 @@ const Navigation = () => {
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={signOut}
                       className="flex items-center gap-2 text-red-600 focus:text-red-600"
                     >
@@ -262,9 +262,9 @@ const Navigation = () => {
                       Donate Now
                     </Link>
                   </Button>
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
+                  <Button
+                    variant="destructive"
+                    size="sm"
                     onClick={() => {
                       signOut();
                       setIsMenuOpen(false);
