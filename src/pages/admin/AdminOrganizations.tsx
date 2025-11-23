@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -23,6 +23,10 @@ import {
   ChevronRight
 } from "lucide-react";
 
+import { evidenceService } from "@/services/evidenceService";
+import { EvidenceList } from "@/components/evidence/EvidenceList";
+import { ImpactEvidence } from "@/types/organizations";
+
 const AdminOrganizations = () => {
   const [organizations, setOrganizations] = useState<OrganizationWithUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,15 +37,13 @@ const AdminOrganizations = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
 
+  const [orgEvidence, setOrgEvidence] = useState<ImpactEvidence[]>([]);
+
   const statusFilter = searchParams.get('status') || 'all';
   const page = parseInt(searchParams.get('page') || '1');
   const limit = 10;
 
-  useEffect(() => {
-    loadOrganizations();
-  }, [statusFilter, page]);
-
-  const loadOrganizations = async () => {
+  const loadOrganizations = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error, totalCount: count } = await adminService.getAllOrganizations(
@@ -68,6 +70,46 @@ const AdminOrganizations = () => {
       });
     } finally {
       setLoading(false);
+    }
+  }, [limit, page, statusFilter, toast]);
+
+  useEffect(() => {
+    loadOrganizations();
+  }, [loadOrganizations]);
+
+  const loadOrgEvidence = async (orgId: string) => {
+    try {
+      const data = await evidenceService.getOrganizationEvidence(orgId);
+      setOrgEvidence(data || []);
+    } catch (error) {
+      console.error("Failed to load evidence", error);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedOrg) {
+      loadOrgEvidence(selectedOrg.id);
+    } else {
+      setOrgEvidence([]);
+    }
+  }, [selectedOrg]);
+
+  const handleDeleteEvidence = async (evidenceId: string) => {
+    try {
+      await evidenceService.deleteEvidence(evidenceId);
+      toast({
+        title: "Success",
+        description: "Evidence deleted successfully",
+      });
+      if (selectedOrg) {
+        loadOrgEvidence(selectedOrg.id);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete evidence",
+        variant: "destructive",
+      });
     }
   };
 
@@ -265,7 +307,7 @@ const AdminOrganizations = () => {
                                   Review and approve/reject organization application
                                 </DialogDescription>
                               </DialogHeader>
-                              
+
                               {selectedOrg && (
                                 <div className="space-y-6">
                                   {/* Organization Details */}
@@ -355,7 +397,7 @@ const AdminOrganizations = () => {
                                         Approve
                                       </Button>
                                     )}
-                                    
+
                                     {selectedOrg.verification_status !== 'rejected' && (
                                       <Button
                                         variant="destructive"
@@ -366,7 +408,7 @@ const AdminOrganizations = () => {
                                         Reject
                                       </Button>
                                     )}
-                                    
+
                                     {selectedOrg.verification_status === 'verified' && (
                                       <Button
                                         variant="outline"
@@ -377,6 +419,16 @@ const AdminOrganizations = () => {
                                         Suspend
                                       </Button>
                                     )}
+                                  </div>
+
+                                  {/* Impact Evidence Section */}
+                                  <div className="pt-6 border-t">
+                                    <h3 className="text-lg font-medium mb-4">Impact Evidence</h3>
+                                    <EvidenceList
+                                      evidence={orgEvidence}
+                                      onDelete={handleDeleteEvidence}
+                                      showTargetInfo={true}
+                                    />
                                   </div>
                                 </div>
                               )}

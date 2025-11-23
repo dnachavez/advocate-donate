@@ -9,7 +9,8 @@ import {
   DonationHistoryResponse,
   DonationStats,
   DonationType,
-  TargetType
+  TargetType,
+  PickupPreference
 } from '../types/donations';
 
 /**
@@ -55,11 +56,11 @@ export class UnifiedDonationService {
       const allDonations = [...cashDonations, ...physicalDonations];
       const filteredDonations = this.filterDonations(allDonations, searchFilters);
       const sortedDonations = this.sortDonations(filteredDonations, sorting);
-      
+
       // Paginate results
       const startIndex = (page - 1) * pageSize;
       const paginatedDonations = sortedDonations.slice(startIndex, startIndex + pageSize);
-      
+
       // Calculate statistics
       const stats = this.calculateStats(allDonations);
 
@@ -94,7 +95,7 @@ export class UnifiedDonationService {
         ...filters,
         pageSize: 1000 // Get all for stats calculation
       });
-      
+
       return history.stats;
     } catch (error) {
       console.error('Error getting donation stats:', error);
@@ -111,7 +112,7 @@ export class UnifiedDonationService {
   ): Promise<{ cash: boolean; physical: boolean; categories?: string[] }> {
     try {
       const donationTypes = await donationTypeService.getEffectiveDonationTypes(targetType, targetId);
-      
+
       if (!donationTypes) {
         return { cash: true, physical: false };
       }
@@ -231,7 +232,7 @@ export class UnifiedDonationService {
         donation.donorName.toLowerCase().includes(searchTerm) ||
         donation.targetName.toLowerCase().includes(searchTerm) ||
         donation.message?.toLowerCase().includes(searchTerm) ||
-        (donation.donationItems?.some(item => 
+        (donation.donationItems?.some(item =>
           item.item_name.toLowerCase().includes(searchTerm) ||
           item.category.toLowerCase().includes(searchTerm)
         ))
@@ -260,13 +261,13 @@ export class UnifiedDonationService {
           donorName: donation.donor_name,
           donorEmail: donation.donor_email,
           message: donation.message,
-          targetType: donation.target_type,
+          targetType: donation.target_type as TargetType,
           targetId: donation.target_id,
           targetName: donation.target_name,
           createdAt: donation.created_at || '',
-          status: donation.donation_status,
+          status: donation.donation_status as any,
           estimatedValue: donation.estimated_value,
-          pickupPreference: donation.pickup_preference,
+          pickupPreference: donation.pickup_preference as PickupPreference,
           donationItems: donation.donation_items || [],
           coordinatorNotes: donation.coordinator_notes
         };
@@ -294,11 +295,13 @@ export class UnifiedDonationService {
     try {
       // This would integrate with the existing donation service
       // For now, returning empty array as implementation depends on existing service structure
+      const startIndex = (filters.page - 1) * filters.pageSize;
+      const endIndex = startIndex + filters.pageSize - 1;
+
       const { data, error } = await supabase
         .from('donations')
         .select('*')
-        .limit(filters.pageSize)
-        .offset((filters.page - 1) * filters.pageSize)
+        .range(startIndex, endIndex)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -316,11 +319,11 @@ export class UnifiedDonationService {
         targetId: donation.target_id,
         targetName: donation.target_name,
         createdAt: donation.created_at || '',
-        status: donation.payment_status,
+        status: donation.payment_status as any,
         amount: donation.amount,
         currency: donation.currency,
         paymentIntentId: donation.payment_intent_id,
-        paymentStatus: donation.payment_status
+        paymentStatus: donation.payment_status as any
       }));
     } catch (error) {
       console.error('Error loading cash donations:', error);
@@ -372,9 +375,9 @@ export class UnifiedDonationService {
         targetId: donation.target_id,
         targetName: donation.target_name,
         createdAt: donation.created_at || '',
-        status: donation.donation_status,
+        status: donation.donation_status as any,
         estimatedValue: donation.estimated_value,
-        pickupPreference: donation.pickup_preference,
+        pickupPreference: donation.pickup_preference as PickupPreference,
         donationItems: donation.donation_items || [],
         coordinatorNotes: donation.coordinator_notes
       }));
@@ -509,13 +512,13 @@ export class UnifiedDonationService {
 
   private calculateMonthlyTrend(donations: UnifiedDonation[]) {
     const monthlyData: Record<string, any> = {};
-    
+
     donations.forEach(donation => {
-      const month = new Date(donation.createdAt).toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short' 
+      const month = new Date(donation.createdAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short'
       });
-      
+
       if (!monthlyData[month]) {
         monthlyData[month] = {
           month,
@@ -540,7 +543,7 @@ export class UnifiedDonationService {
 
   private calculateTopCategories(donations: UnifiedDonation[]) {
     const categoryData: Record<string, any> = {};
-    
+
     donations.forEach(donation => {
       if (donation.type === 'physical' && donation.donationItems) {
         donation.donationItems.forEach(item => {

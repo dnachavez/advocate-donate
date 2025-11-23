@@ -515,26 +515,16 @@ const OrganizationDashboard: React.FC = () => {
               </Button>
             </Link>
 
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full h-20 flex flex-col gap-2"
-                >
-                  <Camera className="h-5 w-5" />
-                  <span className="font-medium">Submit Org Evidence</span>
-                  <span className="text-xs text-gray-500">Post general impact photos</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                {organization && (
-                  <EvidenceUploadForm
-                    targetType="organization"
-                    targetId={organization.slug || organization.id}
-                  />
-                )}
-              </DialogContent>
-            </Dialog>
+            <Link to="/organization/evidence">
+              <Button
+                variant="outline"
+                className="w-full h-20 flex flex-col gap-2"
+              >
+                <Camera className="h-5 w-5" />
+                <span className="font-medium">Impact Evidence</span>
+                <span className="text-xs text-gray-500">View and manage evidence</span>
+              </Button>
+            </Link>
           </div>
         </CardContent>
       </Card>

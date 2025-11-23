@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -35,11 +35,7 @@ const AdminUsers = () => {
   const page = parseInt(searchParams.get('page') || '1');
   const limit = 15;
 
-  useEffect(() => {
-    loadUsers();
-  }, [typeFilter, roleFilter, page]);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error, totalCount: count } = await adminService.getAllUsers(
@@ -67,7 +63,11 @@ const AdminUsers = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [limit, page, typeFilter, toast]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
   const handleFilterChange = (filterType: 'type' | 'role', value: string) => {
     const newParams = new URLSearchParams(searchParams);
@@ -389,7 +389,7 @@ const AdminUsers = () => {
                         </div>
                         {getRoleBadge((user as any).role || 'user')}
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-3 mb-3">
                         <div>
                           <div className="text-xs text-gray-500 mb-1">Type</div>

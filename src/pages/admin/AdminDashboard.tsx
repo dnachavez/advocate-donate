@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -35,17 +35,11 @@ const AdminDashboard = () => {
     { path: '/admin/activity', icon: Activity, label: 'Activity' },
   ];
 
-  useEffect(() => {
-    if (isExactPath) {
-      loadStats();
-    }
-  }, [isExactPath]);
-
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await adminService.getAdminStats();
-      
+
       if (error) {
         toast({
           title: "Error",
@@ -64,7 +58,13 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    if (isExactPath) {
+      loadStats();
+    }
+  }, [isExactPath, loadStats]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -138,10 +138,10 @@ const AdminDashboard = () => {
               <CardContent className="p-0">
                 <nav className="space-y-1">
                   {navigationItems.map((item) => {
-                    const isActive = item.exact 
+                    const isActive = item.exact
                       ? isExactPath
                       : location.pathname.startsWith(item.path) && item.path !== '/admin';
-                    
+
                     return (
                       <Link
                         key={item.path}
@@ -236,7 +236,7 @@ const AdminDashboard = () => {
                           </div>
                         </Link>
                       </Button>
-                      
+
                       <Button variant="outline" asChild className="h-auto p-4">
                         <Link to="/admin/users">
                           <div className="text-center">
@@ -246,7 +246,7 @@ const AdminDashboard = () => {
                           </div>
                         </Link>
                       </Button>
-                      
+
                       <Button variant="outline" asChild className="h-auto p-4">
                         <Link to="/admin/campaigns">
                           <div className="text-center">
@@ -256,7 +256,7 @@ const AdminDashboard = () => {
                           </div>
                         </Link>
                       </Button>
-                      
+
                       <Button variant="outline" asChild className="h-auto p-4">
                         <Link to="/admin/activity">
                           <div className="text-center">

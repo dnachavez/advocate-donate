@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -7,7 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { adminService, type CampaignWithOrganization } from "@/lib/adminService";
+import { evidenceService } from "@/services/evidenceService";
+import { EvidenceList } from "@/components/evidence/EvidenceList";
 import { useToast } from "@/hooks/use-toast";
+import { ImpactEvidence } from "@/types/organizations";
 import {
   Target,
   Eye,
@@ -35,11 +38,9 @@ const AdminCampaigns = () => {
   const page = parseInt(searchParams.get('page') || '1');
   const limit = 10;
 
-  useEffect(() => {
-    loadCampaigns();
-  }, [statusFilter, page]);
+  const [campaignEvidence, setCampaignEvidence] = useState<ImpactEvidence[]>([]);
 
-  const loadCampaigns = async () => {
+  const loadCampaigns = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error, totalCount: count } = await adminService.getAllCampaigns(
@@ -66,6 +67,46 @@ const AdminCampaigns = () => {
       });
     } finally {
       setLoading(false);
+    }
+  }, [limit, page, statusFilter, toast]);
+
+  useEffect(() => {
+    loadCampaigns();
+  }, [loadCampaigns]);
+
+  const loadCampaignEvidence = async (campaignId: string) => {
+    try {
+      const data = await evidenceService.getEvidenceForTarget('campaign', campaignId);
+      setCampaignEvidence(data || []);
+    } catch (error) {
+      console.error("Failed to load evidence", error);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedCampaign) {
+      loadCampaignEvidence(selectedCampaign.slug);
+    } else {
+      setCampaignEvidence([]);
+    }
+  }, [selectedCampaign]);
+
+  const handleDeleteEvidence = async (evidenceId: string) => {
+    try {
+      await evidenceService.deleteEvidence(evidenceId);
+      toast({
+        title: "Success",
+        description: "Evidence deleted successfully",
+      });
+      if (selectedCampaign) {
+        loadCampaignEvidence(selectedCampaign.slug);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete evidence",
+        variant: "destructive",
+      });
     }
   };
 
@@ -233,8 +274,8 @@ const AdminCampaigns = () => {
                 </TableHeader>
                 <TableBody>
                   {campaigns.map((campaign) => {
-                    const progress = calculateProgress(campaign.raised_amount, campaign.target_amount);
-                    
+                    const progress = calculateProgress(campaign.raised_amount, campaign.goal_amount);
+
                     return (
                       <TableRow key={campaign.id}>
                         <TableCell>
@@ -256,10 +297,10 @@ const AdminCampaigns = () => {
                           <div className="space-y-1">
                             <div className="flex justify-between text-sm">
                               <span>{formatCurrency(campaign.raised_amount)}</span>
-                              <span>{formatCurrency(campaign.target_amount)}</span>
+                              <span>{formatCurrency(campaign.goal_amount)}</span>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div 
+                              <div
                                 className="bg-blue-600 h-2 rounded-full transition-all"
                                 style={{ width: `${progress}%` }}
                               />
@@ -268,10 +309,10 @@ const AdminCampaigns = () => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {campaign.deadline && (
+                          {campaign.end_date && (
                             <div className="flex items-center text-sm">
                               <Calendar className="w-4 h-4 mr-1" />
-                              {formatDate(campaign.deadline)}
+                              {formatDate(campaign.end_date)}
                             </div>
                           )}
                         </TableCell>
@@ -295,7 +336,7 @@ const AdminCampaigns = () => {
                                     View campaign details and manage status
                                   </DialogDescription>
                                 </DialogHeader>
-                                
+
                                 {selectedCampaign && (
                                   <div className="space-y-6">
                                     {/* Campaign Info */}
@@ -328,7 +369,7 @@ const AdminCampaigns = () => {
                                       <div>
                                         <label className="font-medium">Target Amount</label>
                                         <p className="text-lg font-bold text-green-600">
-                                          {formatCurrency(selectedCampaign.target_amount)}
+                                          {formatCurrency(selectedCampaign.goal_amount)}
                                         </p>
                                       </div>
                                       <div>
@@ -340,7 +381,7 @@ const AdminCampaigns = () => {
                                       <div>
                                         <label className="font-medium">Progress</label>
                                         <p className="text-lg font-bold">
-                                          {Math.round(calculateProgress(selectedCampaign.raised_amount, selectedCampaign.target_amount))}%
+                                          {Math.round(calculateProgress(selectedCampaign.raised_amount, selectedCampaign.goal_amount))}%
                                         </p>
                                       </div>
                                     </div>
@@ -353,11 +394,11 @@ const AdminCampaigns = () => {
                                           {selectedCampaign.created_at && formatDate(selectedCampaign.created_at)}
                                         </p>
                                       </div>
-                                      {selectedCampaign.deadline && (
+                                      {selectedCampaign.end_date && (
                                         <div>
                                           <label className="font-medium">Deadline</label>
                                           <p className="text-sm text-gray-600">
-                                            {formatDate(selectedCampaign.deadline)}
+                                            {formatDate(selectedCampaign.end_date)}
                                           </p>
                                         </div>
                                       )}
@@ -378,7 +419,7 @@ const AdminCampaigns = () => {
                                             Activate
                                           </Button>
                                         )}
-                                        
+
                                         {selectedCampaign.status === 'active' && (
                                           <Button
                                             variant="outline"
@@ -390,7 +431,7 @@ const AdminCampaigns = () => {
                                             Pause
                                           </Button>
                                         )}
-                                        
+
                                         {selectedCampaign.status !== 'completed' && (
                                           <Button
                                             variant="outline"
@@ -402,7 +443,7 @@ const AdminCampaigns = () => {
                                             Complete
                                           </Button>
                                         )}
-                                        
+
                                         {selectedCampaign.status !== 'cancelled' && (
                                           <Button
                                             variant="destructive"
@@ -415,6 +456,15 @@ const AdminCampaigns = () => {
                                           </Button>
                                         )}
                                       </div>
+                                    </div>
+
+                                    {/* Impact Evidence Section */}
+                                    <div className="pt-6 border-t">
+                                      <h3 className="text-lg font-medium mb-4">Impact Evidence</h3>
+                                      <EvidenceList
+                                        evidence={campaignEvidence}
+                                        onDelete={handleDeleteEvidence}
+                                      />
                                     </div>
                                   </div>
                                 )}
