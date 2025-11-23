@@ -76,13 +76,19 @@ export const EvidenceUploadForm: React.FC<EvidenceUploadFormProps> = ({
 
         setLoading(true);
         try {
+            console.log('Starting evidence submission...');
             setUploading(true);
+
+            console.log('Uploading image...');
             const result = await uploadImage(imageFile);
+            console.log('Upload result:', result);
+
             setUploading(false);
 
             if (result.error) throw new Error(result.error);
-            if (!result.url) throw new Error('Failed to upload image');
+            if (!result.url) throw new Error('Failed to upload image - no URL returned');
 
+            console.log('Submitting evidence data to Supabase...');
             await evidenceService.submitEvidence({
                 target_type: targetType,
                 target_id: targetId,
@@ -91,6 +97,7 @@ export const EvidenceUploadForm: React.FC<EvidenceUploadFormProps> = ({
                 media_urls: [result.url],
                 created_by: user.id
             });
+            console.log('Evidence submitted successfully');
 
             toast({
                 title: 'Evidence submitted',

@@ -1,4 +1,4 @@
-import { put } from '@vercel/blob';
+import { supabase } from "@/integrations/supabase/client";
 
 export interface UploadResult {
   url: string;
@@ -6,10 +6,9 @@ export interface UploadResult {
 }
 
 /**
- * Upload an image file to Vercel blob storage
- * Uses client-side upload in development, server-side in production
+ * Upload an image file to Supabase Storage
  */
-export async function uploadImage(file: File): Promise<UploadResult> {
+export async function uploadImage(file: File, bucket: string = 'evidence'): Promise<UploadResult> {
   try {
     // Validate file type
     if (!file.type.startsWith('image/')) {
@@ -26,32 +25,43 @@ export async function uploadImage(file: File): Promise<UploadResult> {
     const timestamp = Date.now();
     const randomSuffix = Math.random().toString(36).substring(2, 8);
     const fileExtension = file.name.split('.').pop() || 'jpg';
-    const fileName = `profile-pictures/${timestamp}-${randomSuffix}.${fileExtension}`;
+    const fileName = `${timestamp}-${randomSuffix}.${fileExtension}`;
 
-    // Always use client-side upload for now (will work in both dev and prod)
-    console.log('Using client-side upload, hostname:', window.location.hostname);
-    console.log('CSP meta tag:', document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content'));
-    
-    // Use client-side upload
-    const blobToken = import.meta.env.VITE_BLOB_READ_WRITE_TOKEN;
-    if (!blobToken) {
-      return { 
-        url: '', 
-        error: 'Image upload is not configured. Please contact support.' 
-      };
+    // Upload to Supabase Storage
+    // Create a promise that rejects after 30 seconds to prevent hanging
+    const uploadPromise = supabase.storage
+      .from(bucket)
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    const timeoutPromise = new Promise<{ data: any; error: any }>((_, reject) =>
+      setTimeout(() => reject(new Error('Upload timed out')), 30000)
+    );
+
+    const { data, error } = await Promise.race([uploadPromise, timeoutPromise]);
+
+    if (error) {
+      console.error('Supabase storage upload error:', error);
+      // Check for specific error codes if possible, or give a helpful message
+      if (error.message?.includes('Bucket not found')) {
+        return { url: '', error: 'Storage bucket not found. Please contact support.' };
+      }
+      return { url: '', error: error.message || 'Failed to upload image' };
     }
 
-    const blob = await put(fileName, file, {
-      access: 'public',
-      token: blobToken,
-    });
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(fileName);
 
-    return { url: blob.url };
+    return { url: publicUrl };
   } catch (error) {
     console.error('Error uploading image:', error);
-    return { 
-      url: '', 
-      error: error instanceof Error ? error.message : 'Failed to upload image' 
+    return {
+      url: '',
+      error: error instanceof Error ? error.message : 'Failed to upload image'
     };
   }
 }
