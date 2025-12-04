@@ -19,6 +19,7 @@ const OrganizationEvidence: React.FC = () => {
     const [organization, setOrganization] = useState<any | null>(null);
     const [evidence, setEvidence] = useState<ImpactEvidence[]>([]);
     const [loading, setLoading] = useState(true);
+    const [editingEvidence, setEditingEvidence] = useState<ImpactEvidence | null>(null);
 
     useEffect(() => {
         const loadData = async () => {
@@ -54,6 +55,32 @@ const OrganizationEvidence: React.FC = () => {
     }, [toast]);
 
     const handleEvidenceSubmitted = async () => {
+        if (organization) {
+            const evidenceData = await evidenceService.getOrganizationEvidence(organization.id);
+            setEvidence(evidenceData);
+        }
+    };
+
+    const handleEditEvidence = (evidence: ImpactEvidence) => {
+        setEditingEvidence(evidence);
+    };
+
+    const handleDeleteEvidence = async (id: string) => {
+        try {
+            await evidenceService.deleteEvidence(id);
+            if (organization) {
+                const evidenceData = await evidenceService.getOrganizationEvidence(organization.id);
+                setEvidence(evidenceData);
+            }
+            toast({ title: "Evidence deleted" });
+        } catch (error) {
+            console.error(error);
+            toast({ title: "Error deleting evidence", variant: "destructive" });
+        }
+    };
+
+    const handleEditSuccess = async () => {
+        setEditingEvidence(null);
         if (organization) {
             const evidenceData = await evidenceService.getOrganizationEvidence(organization.id);
             setEvidence(evidenceData);
@@ -116,9 +143,26 @@ const OrganizationEvidence: React.FC = () => {
                     <EvidenceList
                         evidence={evidence}
                         showTargetInfo={true}
+                        onEdit={handleEditEvidence}
+                        onDelete={handleDeleteEvidence}
                     />
                 </CardContent>
             </Card>
+
+            {/* Edit Evidence Dialog */}
+            <Dialog open={!!editingEvidence} onOpenChange={(open) => !open && setEditingEvidence(null)}>
+                <DialogContent>
+                    {editingEvidence && (
+                        <EvidenceUploadForm
+                            targetType={editingEvidence.target_type}
+                            targetId={editingEvidence.target_id}
+                            initialData={editingEvidence}
+                            onSuccess={handleEditSuccess}
+                            onCancel={() => setEditingEvidence(null)}
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

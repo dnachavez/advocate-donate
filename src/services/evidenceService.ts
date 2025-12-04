@@ -96,5 +96,20 @@ export const evidenceService = {
             .eq('id', id));
 
         if (error) throw error;
+    },
+
+    /**
+     * Update evidence
+     */
+    async updateEvidence(id: string, updates: Partial<ImpactEvidence>) {
+        const { data, error } = await (supabase
+            .from('impact_evidence' as any)
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single());
+
+        if (error) throw error;
+        return data;
     }
 };

@@ -10,13 +10,27 @@ import { useEffect, useState } from "react";
 import { campaignService, type CampaignWithOrganization } from "@/lib/campaignService";
 import campaignImage from "@/assets/food-donations.jpg";
 import { EvidenceGallery } from "@/components/evidence/EvidenceGallery";
+import { useAuth } from '@/contexts/AuthContext';
+import { organizationService } from '@/lib/organizationService';
+import { evidenceService } from '@/services/evidenceService';
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { EvidenceUploadForm } from '@/components/evidence/EvidenceUploadForm';
+import { ImpactEvidence } from '@/types/organizations';
+import { useToast } from '@/hooks/use-toast';
 
 const CampaignDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
+
   const [campaign, setCampaign] = useState<CampaignWithOrganization | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [userOrg, setUserOrg] = useState<any | null>(null);
+  const [editingEvidence, setEditingEvidence] = useState<ImpactEvidence | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     const fetchCampaign = async () => {
@@ -39,6 +53,37 @@ const CampaignDetail = () => {
 
     fetchCampaign();
   }, [id]);
+
+  useEffect(() => {
+    const fetchUserOrg = async () => {
+      if (!user) return;
+      const { data } = await organizationService.getCurrentUserOrganization();
+      setUserOrg(data);
+    };
+    fetchUserOrg();
+  }, [user]);
+
+  const isOwner = userOrg && campaign && userOrg.id === campaign.organization_id;
+
+  const handleEditEvidence = (evidence: ImpactEvidence) => {
+    setEditingEvidence(evidence);
+  };
+
+  const handleDeleteEvidence = async (id: string) => {
+    try {
+      await evidenceService.deleteEvidence(id);
+      setRefreshTrigger(prev => prev + 1);
+      toast({ title: "Evidence deleted" });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error deleting evidence", variant: "destructive" });
+    }
+  };
+
+  const handleEvidenceSuccess = () => {
+    setEditingEvidence(null);
+    setRefreshTrigger(prev => prev + 1);
+  };
 
   if (loading) {
     return (
@@ -125,7 +170,13 @@ const CampaignDetail = () => {
               {/* Impact Evidence Section */}
               <div className="mt-8">
                 <h2 className="text-xl font-semibold mb-4">Impact Evidence</h2>
-                <EvidenceGallery targetType="campaign" targetId={campaign.slug} />
+                <EvidenceGallery
+                  targetType="campaign"
+                  targetId={campaign.slug}
+                  refreshTrigger={refreshTrigger}
+                  onEdit={isOwner ? handleEditEvidence : undefined}
+                  onDelete={isOwner ? handleDeleteEvidence : undefined}
+                />
               </div>
 
               <div className="mt-6">
@@ -171,6 +222,21 @@ const CampaignDetail = () => {
       </section>
 
       <Footer />
+
+      {/* Edit Evidence Dialog */}
+      <Dialog open={!!editingEvidence} onOpenChange={(open) => !open && setEditingEvidence(null)}>
+        <DialogContent>
+          {editingEvidence && (
+            <EvidenceUploadForm
+              targetType="campaign"
+              targetId={campaign.slug}
+              initialData={editingEvidence}
+              onSuccess={handleEvidenceSuccess}
+              onCancel={() => setEditingEvidence(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Trash2, Calendar, ExternalLink } from 'lucide-react';
+import { Calendar, Edit, X } from 'lucide-react';
 import { ImpactEvidence } from '@/types/organizations';
 import {
     AlertDialog,
@@ -15,16 +15,25 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+    Carousel,
+    CarouselContent,
+    CarouselItem,
+    CarouselNext,
+    CarouselPrevious,
+} from "@/components/ui/carousel";
 
 interface EvidenceListProps {
     evidence: ImpactEvidence[];
     onDelete?: (id: string) => Promise<void>;
+    onEdit?: (evidence: ImpactEvidence) => void;
     showTargetInfo?: boolean;
 }
 
 export const EvidenceList: React.FC<EvidenceListProps> = ({
     evidence,
     onDelete,
+    onEdit,
     showTargetInfo = false
 }) => {
     if (!evidence || evidence.length === 0) {
@@ -38,18 +47,74 @@ export const EvidenceList: React.FC<EvidenceListProps> = ({
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {evidence.map((item) => (
-                <Card key={item.id} className="overflow-hidden">
+                <Card key={item.id} className="overflow-hidden group relative">
+                    {/* Edit/Delete Overlay */}
+                    {(onEdit || onDelete) && (
+                        <div className="absolute top-2 right-2 z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {onEdit && (
+                                <Button
+                                    variant="secondary"
+                                    size="icon"
+                                    className="h-8 w-8 rounded-full bg-white/90 hover:bg-white shadow-sm"
+                                    onClick={() => onEdit(item)}
+                                >
+                                    <Edit className="w-4 h-4 text-gray-700" />
+                                </Button>
+                            )}
+                            {onDelete && (
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button
+                                            variant="destructive"
+                                            size="icon"
+                                            className="h-8 w-8 rounded-full shadow-sm"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Delete Evidence?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This action cannot be undone. This will permanently delete this impact evidence.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => onDelete(item.id)} className="bg-red-600 hover:bg-red-700">
+                                                Delete
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            )}
+                        </div>
+                    )}
+
                     {item.media_urls && item.media_urls.length > 0 && (
-                        <div className="aspect-video w-full overflow-hidden bg-gray-100 relative group">
-                            <img
-                                src={item.media_urls[0]}
-                                alt={item.title}
-                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                            />
-                            {item.media_urls.length > 1 && (
-                                <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
-                                    +{item.media_urls.length - 1} more
-                                </div>
+                        <div className="aspect-video w-full overflow-hidden bg-gray-100">
+                            {item.media_urls.length > 1 ? (
+                                <Carousel className="w-full h-full">
+                                    <CarouselContent>
+                                        {item.media_urls.map((url, index) => (
+                                            <CarouselItem key={index}>
+                                                <img
+                                                    src={url}
+                                                    alt={`${item.title} - ${index + 1}`}
+                                                    className="w-full h-full object-cover aspect-video"
+                                                />
+                                            </CarouselItem>
+                                        ))}
+                                    </CarouselContent>
+                                    <CarouselPrevious className="left-2" />
+                                    <CarouselNext className="right-2" />
+                                </Carousel>
+                            ) : (
+                                <img
+                                    src={item.media_urls[0]}
+                                    alt={item.title}
+                                    className="w-full h-full object-cover"
+                                />
                             )}
                         </div>
                     )}
@@ -80,30 +145,6 @@ export const EvidenceList: React.FC<EvidenceListProps> = ({
                                 <Calendar className="w-3 h-3 mr-1" />
                                 {new Date(item.submitted_at).toLocaleDateString()}
                             </div>
-
-                            {onDelete && (
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0">
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>Delete Evidence?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                This action cannot be undone. This will permanently delete this impact evidence.
-                                            </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => onDelete(item.id)} className="bg-red-600 hover:bg-red-700">
-                                                Delete
-                                            </AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                            )}
                         </div>
                     </CardContent>
                 </Card>
