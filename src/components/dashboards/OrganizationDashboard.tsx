@@ -324,8 +324,8 @@ const OrganizationDashboard: React.FC = () => {
             <div className="flex items-center gap-3 p-4 bg-orange-50 rounded-lg">
               <Gift className="h-8 w-8 text-orange-600" />
               <div>
-                <p className="text-2xl font-bold text-orange-900">{formatCurrency(donationStats.totalCashAmount + donationStats.totalEstimatedValue, 'PHP')}</p>
-                <p className="text-sm text-orange-700">Total Impact</p>
+                <p className="text-2xl font-bold text-orange-900">{donationStats.totalCashDonations + donationStats.totalPhysicalDonations}</p>
+                <p className="text-sm text-orange-700">Families Impacted</p>
               </div>
             </div>
           </div>

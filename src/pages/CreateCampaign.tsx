@@ -564,7 +564,7 @@ const CreateCampaign: React.FC = () => {
                       <p className="text-sm text-muted-foreground mb-3">{formData.short_description || 'Your short description will appear here...'}</p>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">
-                          {formData.currency === 'USD' ? '$' : '₱'}0 raised of {formData.currency === 'USD' ? '$' : '₱'}{formData.goal_amount || '0'} goal
+                          ₱0 raised of ₱{formData.goal_amount || '0'} goal
                         </span>
                         <span className="text-muted-foreground">
                           {formData.end_date ? Math.ceil((new Date(formData.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : '0'} days left

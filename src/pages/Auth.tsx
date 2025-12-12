@@ -38,6 +38,7 @@ interface SignUpForm {
   userType: string;
   organizationName?: string;
   registrationNumber?: string;
+  publicSolicitationNumber?: string;
   website?: string;
   companyName?: string;
   businessRegistration?: string;
@@ -68,7 +69,8 @@ const Auth = () => {
     confirmPassword: '',
     fullName: '',
     phoneNumber: '',
-    userType: ''
+    userType: '',
+    publicSolicitationNumber: ''
   });
   
   // Validation states
@@ -278,6 +280,9 @@ const Auth = () => {
       if (signUpForm.userType === 'nonprofit') {
         additionalData.organization_name = sanitizeInput(signUpForm.organizationName || '');
         additionalData.registration_number = sanitizeInput(signUpForm.registrationNumber || '');
+        if (signUpForm.publicSolicitationNumber) {
+          additionalData.public_solicitation_number = sanitizeInput(signUpForm.publicSolicitationNumber);
+        }
         if (signUpForm.website) {
           additionalData.website = sanitizeInput(signUpForm.website);
         }
@@ -307,7 +312,8 @@ const Auth = () => {
           confirmPassword: '',
           fullName: '',
           phoneNumber: '',
-          userType: ''
+          userType: '',
+          publicSolicitationNumber: ''
         });
         
         // Don't auto-switch tabs, let user verify email first
@@ -707,6 +713,16 @@ const Auth = () => {
                             {signUpErrors.registrationNumber && (
                               <p className="text-sm text-red-600 mt-1">{signUpErrors.registrationNumber}</p>
                             )}
+                          </div>
+                          <div>
+                            <Input 
+                              placeholder="Public solicitation number" 
+                              value={signUpForm.publicSolicitationNumber || ''}
+                              onChange={(e) => {
+                                setSignUpForm(prev => ({ ...prev, publicSolicitationNumber: e.target.value }));
+                              }}
+                              disabled={loading}
+                            />
                           </div>
                           <Input 
                             placeholder="Website (optional)" 

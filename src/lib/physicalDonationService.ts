@@ -52,6 +52,8 @@ export class PhysicalDonationService {
           target_id: donationData.targetId,
           target_name: donationData.targetName,
           user_id: userId,
+          organization_id: donationData.targetType === 'organization' ? donationData.targetId : null,
+          campaign_id: donationData.targetType === 'campaign' ? donationData.targetId : null,
           pickup_preference: donationData.pickupPreference,
           pickup_address: donationData.pickupAddress,
           pickup_instructions: donationData.pickupInstructions,

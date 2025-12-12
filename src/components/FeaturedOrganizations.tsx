@@ -24,7 +24,7 @@ const FeaturedOrganizations = () => {
       try {
         setLoading(true);
         const { data, error } = await organizationService.getOrganizations(3, 0);
-        
+
         if (error) {
           toast({
             title: "Error",
@@ -35,19 +35,19 @@ const FeaturedOrganizations = () => {
         }
 
         setOrganizations(data);
-        
+
         // Fetch stats for each organization
-        const statsPromises = data.map(org => 
+        const statsPromises = data.map(org =>
           organizationService.getOrganizationDonationStats(org.id)
         );
-        
+
         const statsResults = await Promise.all(statsPromises);
         const statsMap: Record<string, {
           totalRaised: number;
           donationCount: number;
           campaignCount: number;
         }> = {};
-        
+
         data.forEach((org, index) => {
           const stats = statsResults[index];
           if (!stats.error) {
@@ -58,7 +58,7 @@ const FeaturedOrganizations = () => {
             };
           }
         });
-        
+
         setOrganizationStats(statsMap);
       } catch (error) {
         console.error('Error fetching featured organizations:', error);
@@ -87,7 +87,7 @@ const FeaturedOrganizations = () => {
             Trusted Partners Making a Difference
           </h2>
           <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-            Meet the verified organizations creating real impact in communities across the Philippines. 
+            Meet the verified organizations creating real impact in communities across the Philippines.
             Every donation goes directly to their approved programs.
           </p>
         </div>
@@ -112,96 +112,85 @@ const FeaturedOrganizations = () => {
             </div>
           ) : (
             organizations.map((org) => (
-            <Card
-              key={org.id}
-              className="group overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-card cursor-pointer"
-              onClick={() => navigate(`/organizations/${org.slug}`)}
-            >
-              {/* Organization Image */}
-              <div className="relative h-48 overflow-hidden">
-                <img
-                  src={org.banner_url || org.logo_url || organizationImage}
-                  alt={org.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                <div className="absolute top-4 left-4">
-                  <Badge variant={org.verification_status === 'verified' ? "default" : "secondary"} className="bg-success text-success-foreground">
-                    <Verified className="w-3 h-3 mr-1" />
-                    {org.verification_status === 'verified' ? 'Verified' : 'Pending'}
-                  </Badge>
-                </div>
-                <div className="absolute top-4 right-4">
-                  <Badge variant="outline" className="bg-white/90 text-foreground">
-                    {org.category}
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Organization Content */}
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-xl font-semibold text-foreground group-hover:text-primary transition-colors">
-                    {org.name}
-                  </h3>
-                </div>
-                
-                <div className="flex items-center text-muted-foreground text-sm mb-3">
-                  <MapPin className="w-4 h-4 mr-1" />
-                  {org.city ? `${org.city}, ${org.state || org.country}` : org.country || 'Location not specified'}
-                </div>
-
-                <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
-                  {org.description}
-                </p>
-
-                {/* Stats */}
-                <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
-                  <div className="flex items-center">
-                    <Users className="w-4 h-4 mr-1" />
-                    {organizationStats[org.id]?.donationCount || 0} donors
+              <Card
+                key={org.id}
+                className="group overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-card cursor-pointer"
+                onClick={() => navigate(`/organizations/${org.slug}`)}
+              >
+                {/* Organization Image */}
+                <div className="relative h-48 overflow-hidden">
+                  <img
+                    src={org.banner_url || org.logo_url || organizationImage}
+                    alt={org.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  <div className="absolute top-4 left-4">
+                    <Badge variant={org.verification_status === 'verified' ? "default" : "secondary"} className="bg-success text-success-foreground">
+                      <Verified className="w-3 h-3 mr-1" />
+                      {org.verification_status === 'verified' ? 'Verified' : 'Pending'}
+                    </Badge>
                   </div>
-                  <div className="flex items-center">
-                    <Target className="w-4 h-4 mr-1" />
-                    {organizationStats[org.id]?.campaignCount || 0} campaigns
+                  <div className="absolute top-4 right-4">
+                    <Badge variant="outline" className="bg-white/90 text-foreground">
+                      {org.category}
+                    </Badge>
                   </div>
                 </div>
 
-                {/* Total Raised */}
-                <div className="bg-success-light rounded-lg p-3 mb-4">
-                  <div className="text-xs text-success-dark font-medium mb-1">Total Raised</div>
-                  <div className="text-sm font-semibold text-success">
-                    ₱{(organizationStats[org.id]?.totalRaised || 0).toLocaleString()}
+                {/* Organization Content */}
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xl font-semibold text-foreground group-hover:text-primary transition-colors">
+                      {org.name}
+                    </h3>
+                  </div>
+
+                  <div className="flex items-center text-muted-foreground text-sm mb-3">
+                    <MapPin className="w-4 h-4 mr-1" />
+                    {org.city ? `${org.city}, ${org.state || org.country}` : org.country || 'Location not specified'}
+                  </div>
+
+                  <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
+                    {org.description}
+                  </p>
+
+                  {/* Stats */}
+                  <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
+                    <div className="flex items-center">
+                      <Users className="w-4 h-4 mr-1" />
+                      {organizationStats[org.id]?.donationCount || 0} donors
+                    </div>
+                    <div className="flex items-center">
+                      <Target className="w-4 h-4 mr-1" />
+                      {organizationStats[org.id]?.campaignCount || 0} campaigns
+                    </div>
+                  </div>
+
+                  {/* Total Raised */}
+                  <div className="bg-success-light rounded-lg p-3 mb-4">
+                    <div className="text-xs text-success-dark font-medium mb-1">Total Raised</div>
+                    <div className="text-sm font-semibold text-success">
+                      ₱{(organizationStats[org.id]?.totalRaised || 0).toLocaleString()}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="w-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/organizations/${org.slug}`);
+                      }}
+                    >
+                      View Details
+                    </Button>
                   </div>
                 </div>
-
-                {/* Actions */}
-                <div className="flex gap-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="flex-1"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/organizations/${org.slug}`);
-                    }}
-                  >
-                    View Details
-                  </Button>
-                  <Button
-                    variant="donate"
-                    size="sm"
-                    className="flex-1"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/organizations/${org.slug}/donate`);
-                    }}
-                  >
-                    Donate Now
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          ))
+              </Card>
+            ))
           )}
         </div>
 

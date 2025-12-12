@@ -239,6 +239,20 @@ class PaymentService {
       // In production, we might allow guest donations, but for now we link to user if available
       const userId = session?.user?.id || null;
 
+      // If this is a campaign donation, fetch the organization_id from the campaign
+      let organizationId = donationData.organizationId || null;
+      if (donationData.campaignId && !organizationId) {
+        const { data: campaign } = await supabase
+          .from('campaigns')
+          .select('organization_id')
+          .eq('id', donationData.campaignId)
+          .single();
+
+        if (campaign?.organization_id) {
+          organizationId = campaign.organization_id;
+        }
+      }
+
       // Map the donation data to match the database schema
       const donationRecord: TablesInsert<'donations'> = {
         amount: donationData.amount,
@@ -258,7 +272,7 @@ class PaymentService {
         message: donationData.message || null,
         processed_at: new Date().toISOString(),
         user_id: userId,
-        organization_id: donationData.organizationId || null,
+        organization_id: organizationId,
         campaign_id: donationData.campaignId || null
       };
 

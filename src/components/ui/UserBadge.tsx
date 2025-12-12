@@ -83,11 +83,10 @@ export const UserBadge: React.FC<UserBadgeProps> = ({
       .join(' ');
   };
 
-  // Format currency amounts
   const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-PH', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'PHP',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);

@@ -7,12 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  Search, 
-  Filter, 
-  MapPin, 
-  Users, 
-  Target, 
+import {
+  Search,
+  Filter,
+  MapPin,
+  Users,
+  Target,
   Verified,
   Grid3X3,
   List,
@@ -64,7 +64,7 @@ const Organizations = () => {
       } else {
         setOrganizations(prev => [...prev, ...data]);
       }
-      
+
       setTotalCount(count);
     } catch (err) {
       console.error('Error loading organizations:', err);
@@ -80,13 +80,13 @@ const Organizations = () => {
   }, []);
 
   const filteredOrganizations = organizations.filter(org => {
-    const matchesSearch = !searchTerm || 
+    const matchesSearch = !searchTerm ||
       org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       org.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       org.city?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesCategory = selectedCategory === 'All Categories' || org.category === selectedCategory;
-    
+
     return matchesSearch && matchesCategory;
   });
 
@@ -99,7 +99,7 @@ const Organizations = () => {
   const categories = [
     "All Categories",
     "Education",
-    "Healthcare", 
+    "Healthcare",
     "Environment",
     "Social Services",
     "Arts & Culture",
@@ -116,7 +116,7 @@ const Organizations = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      
+
       {/* Header Section */}
       <section className="py-20 bg-gradient-hero text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -124,7 +124,7 @@ const Organizations = () => {
             Verified Organizations
           </h1>
           <p className="text-xl text-white/90 max-w-3xl mx-auto">
-            Discover trusted organizations creating real impact in communities 
+            Discover trusted organizations creating real impact in communities
             across the Philippines. Every organization is verified and transparent.
           </p>
         </div>
@@ -216,8 +216,8 @@ const Organizations = () => {
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                {error}. <button 
-                  onClick={() => loadOrganizations(true)} 
+                {error}. <button
+                  onClick={() => loadOrganizations(true)}
                   className="underline hover:no-underline"
                 >
                   Try again
@@ -271,7 +271,7 @@ const Organizations = () => {
                             {org.name}
                           </h3>
                         </div>
-                        
+
                         <div className="flex items-center text-muted-foreground text-sm mb-3">
                           <MapPin className="w-4 h-4 mr-1" />
                           {org.city}, {org.state}
@@ -309,24 +309,13 @@ const Organizations = () => {
                           <Button
                             variant="default"
                             size="sm"
-                            className="flex-1"
+                            className="w-full"
                             onClick={(e) => {
                               e.stopPropagation();
                               navigate(`/organizations/${org.slug}`);
                             }}
                           >
                             View Details
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/organizations/${org.slug}/donate`);
-                            }}
-                          >
-                            Donate Now
                           </Button>
                         </div>
                       </div>
@@ -345,8 +334,8 @@ const Organizations = () => {
                       : 'No verified organizations are available at the moment.'}
                   </p>
                   {(searchTerm || selectedCategory !== 'All Categories') && (
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={() => {
                         setSearchTerm('');
                         setSelectedCategory('All Categories');
@@ -363,8 +352,8 @@ const Organizations = () => {
           {/* Load More */}
           {!loading && !error && organizations.length < totalCount && (
             <div className="text-center mt-12">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="lg"
                 onClick={handleLoadMore}
                 disabled={loadingMore}
