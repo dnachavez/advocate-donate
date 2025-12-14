@@ -359,7 +359,10 @@ const UnifiedDonationHistory: React.FC<UnifiedDonationHistoryProps> = ({
         setDonations(prev => [...prev, ...filteredDonations]);
       }
 
-      setHasMore(filteredDonations.length === pageSize);
+      // Check hasMore based on whether either source returned a full page
+      // Since cash and physical donations are paginated independently, we need to check
+      // if either source might have more data, not the combined total
+      setHasMore(cashDonations.length === pageSize || physicalDonations.length === pageSize);
       calculateStats(allDonations);
     } catch (err) {
       setError('Failed to load donation history');
@@ -1020,16 +1023,16 @@ const UnifiedDonationHistory: React.FC<UnifiedDonationHistoryProps> = ({
                                         <p className="text-sm">{formatDate((selectedDonation as any).preferredPickupDate)}</p>
                                       </div>
                                     )}
-                                    {(selectedDonation as any).confirmed_at && (
+                                    {(selectedDonation as any).confirmedAt && (
                                       <div>
                                         <Label className="text-sm font-medium">Confirmed At</Label>
-                                        <p className="text-sm">{formatDate((selectedDonation as any).confirmed_at)}</p>
+                                        <p className="text-sm">{formatDate((selectedDonation as any).confirmedAt)}</p>
                                       </div>
                                     )}
-                                    {(selectedDonation as any).received_at && (
+                                    {(selectedDonation as any).receivedAt && (
                                       <div>
                                         <Label className="text-sm font-medium">Received At</Label>
-                                        <p className="text-sm">{formatDate((selectedDonation as any).received_at)}</p>
+                                        <p className="text-sm">{formatDate((selectedDonation as any).receivedAt)}</p>
                                       </div>
                                     )}
                                   </div>
