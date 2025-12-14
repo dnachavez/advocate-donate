@@ -117,6 +117,33 @@ export const campaignService = {
   },
 
   /**
+   * Get all campaigns by organization (active and inactive)
+   */
+  async getAllCampaignsByOrganization(organizationId: string): Promise<{
+    data: Campaign[];
+    error: string | null;
+  }> {
+    try {
+      const { data, error } = await supabase
+        .from('campaigns')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return { data: [], error: error.message };
+      }
+
+      return { data: data || [], error: null };
+    } catch (error) {
+      return { 
+        data: [], 
+        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      };
+    }
+  },
+
+  /**
    * Create campaign
    */
   async createCampaign(campaignData: CampaignInsert): Promise<{

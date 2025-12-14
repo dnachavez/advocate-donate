@@ -99,10 +99,10 @@ const OrganizationDashboard: React.FC = () => {
                 campaignCount: campaigns.filter(c => c.status === 'active').length
               });
 
-              // Load unified donation stats for organization
-              const unifiedStats = await unifiedDonationService.getDonationStats({
-                organizationId: orgData.id
-              });
+              // Load comprehensive donation stats for organization across all campaigns
+              console.log('Loading donation stats for organization:', orgData.id, orgData.name);
+              const unifiedStats = await unifiedDonationService.getOrganizationCampaignDonationsStats(orgData.id);
+              console.log('Donation stats received:', unifiedStats);
               setDonationStats(unifiedStats);
             }
           }
@@ -375,7 +375,7 @@ const OrganizationDashboard: React.FC = () => {
             <UnifiedDonationHistory
               organizationId={organization.id}
               showFilters={true}
-              pageSize={15}
+              pageSize={100}
               className=""
             />
           </CardContent>

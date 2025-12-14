@@ -39,6 +39,20 @@ export class PhysicalDonationService {
         };
       }
 
+      // If this is a campaign donation, fetch the organization_id from the campaign
+      let organizationId = donationData.targetType === 'organization' ? donationData.targetId : null;
+      if (donationData.targetType === 'campaign' && donationData.targetId) {
+        const { data: campaign } = await supabase
+          .from('campaigns')
+          .select('organization_id')
+          .eq('id', donationData.targetId)
+          .single();
+
+        if (campaign?.organization_id) {
+          organizationId = campaign.organization_id;
+        }
+      }
+
       // Start a transaction
       const { data: donation, error: donationError } = await supabase
         .from('physical_donations')
@@ -52,7 +66,7 @@ export class PhysicalDonationService {
           target_id: donationData.targetId,
           target_name: donationData.targetName,
           user_id: userId,
-          organization_id: donationData.targetType === 'organization' ? donationData.targetId : null,
+          organization_id: organizationId,
           campaign_id: donationData.targetType === 'campaign' ? donationData.targetId : null,
           pickup_preference: donationData.pickupPreference,
           pickup_address: donationData.pickupAddress,

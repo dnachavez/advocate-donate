@@ -30,6 +30,8 @@ import { donationService } from '../lib/donationService';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 import { physicalDonationService } from '../lib/physicalDonationService';
+import { campaignService } from '../lib/campaignService';
+import { useToast } from '@/hooks/use-toast';
 import {
   UnifiedDonation,
   DonationHistoryFilters,
@@ -59,7 +61,7 @@ const UnifiedDonationHistory: React.FC<UnifiedDonationHistoryProps> = ({
   organizationId,
   campaignId,
   showFilters = true,
-  pageSize = 20,
+  pageSize = 100,
   className = ''
 }) => {
   const [donations, setDonations] = useState<UnifiedDonation[]>([]);
@@ -69,6 +71,8 @@ const UnifiedDonationHistory: React.FC<UnifiedDonationHistoryProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [selectedDonation, setSelectedDonation] = useState<UnifiedDonation | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const [filters, setFilters] = useState<DonationHistoryFilters>({
     donationType: 'all',
@@ -98,21 +102,66 @@ const UnifiedDonationHistory: React.FC<UnifiedDonationHistoryProps> = ({
       const offset = (page - 1) * pageSize;
 
       // Organization context: received donations (cash)
+      // Include both direct org donations and donations to all organization campaigns
       if (organizationId) {
-        const { donations, error } = await donationService.getOrganizationReceivedDonations(
+        // Get all campaigns for the organization
+        const { data: campaigns, error: campaignsError } = await campaignService.getAllCampaignsByOrganization(organizationId);
+        const campaignIds = campaigns?.map(c => c.id) || [];
+
+        // Fetch direct organization donations
+        const { donations: orgDonations, error: orgError } = await donationService.getOrganizationReceivedDonations(
           organizationId,
-          pageSize,
-          offset
+          10000, // Large limit to get all, we'll paginate after combining
+          0
         );
-        if (error) {
-          console.error('Error loading org cash donations:', error);
-          return [];
+        
+        if (orgError) {
+          console.error('Error loading org cash donations:', orgError);
         }
-        return (donations || []).map((d) => ({
+
+        // Fetch campaign donations
+        let campaignDonations: any[] = [];
+        if (campaignIds.length > 0) {
+          const { data: campaignDonationsData, error: campaignError } = await supabase
+            .from('donations')
+            .select('*')
+            .in('campaign_id', campaignIds)
+            .eq('payment_status', 'succeeded')
+            .order('created_at', { ascending: false });
+
+          if (campaignError) {
+            console.error('Error loading campaign cash donations:', campaignError);
+          } else {
+            campaignDonations = campaignDonationsData || [];
+          }
+        }
+
+        // Combine and deduplicate donations
+        const allDonationsMap = new Map<string, any>();
+        (orgDonations || []).forEach((d: any) => {
+          allDonationsMap.set(d.id, d);
+        });
+        campaignDonations.forEach((d: any) => {
+          allDonationsMap.set(d.id, d);
+        });
+
+        const allDonations = Array.from(allDonationsMap.values());
+        
+        // Sort by created_at descending
+        allDonations.sort((a, b) => {
+          const dateA = new Date(a.created_at).getTime();
+          const dateB = new Date(b.created_at).getTime();
+          return dateB - dateA;
+        });
+
+        // Apply pagination
+        const paginatedDonations = allDonations.slice(offset, offset + pageSize);
+
+        return paginatedDonations.map((d) => ({
           id: d.id,
           type: 'cash',
-          donorName: 'Donor',
-          donorEmail: '',
+          donorName: d.donor_name || d.donor_email || 'Donor',
+          donorEmail: d.donor_email || '',
           message: d.message,
           targetType: mapTargetType(d.target_type as string),
           targetId: d.target_id,
@@ -190,12 +239,49 @@ const UnifiedDonationHistory: React.FC<UnifiedDonationHistoryProps> = ({
       let physicalDonations: PhysicalDonationWithItems[] = [];
 
       if (organizationId) {
-        physicalDonations = await physicalDonationService.getDonationsForOrganization(
+        // Get all campaigns for the organization
+        const { data: campaigns, error: campaignsError } = await campaignService.getAllCampaignsByOrganization(organizationId);
+        const campaignIds = campaigns?.map(c => c.id) || [];
+
+        // Fetch direct organization physical donations
+        const orgPhysicalDonations = await physicalDonationService.getDonationsForOrganization(
           organizationId,
           undefined,
-          pageSize,
-          (page - 1) * pageSize
+          10000, // Large limit to get all, we'll paginate after combining
+          0
         );
+        physicalDonations.push(...orgPhysicalDonations);
+
+        // Fetch physical donations for each campaign
+        for (const campaignId of campaignIds) {
+          const campaignPhysicalDonations = await physicalDonationService.getDonationsForCampaign(
+            campaignId,
+            undefined,
+            10000, // Large limit to get all
+            0
+          );
+          physicalDonations.push(...campaignPhysicalDonations);
+        }
+
+        // Deduplicate physical donations
+        const uniqueDonationsMap = new Map<string, PhysicalDonationWithItems>();
+        physicalDonations.forEach(donation => {
+          if (!uniqueDonationsMap.has(donation.id)) {
+            uniqueDonationsMap.set(donation.id, donation);
+          }
+        });
+        physicalDonations = Array.from(uniqueDonationsMap.values());
+
+        // Sort by created_at descending
+        physicalDonations.sort((a, b) => {
+          const dateA = new Date(a.created_at || '').getTime();
+          const dateB = new Date(b.created_at || '').getTime();
+          return dateB - dateA;
+        });
+
+        // Apply pagination
+        const offset = (page - 1) * pageSize;
+        physicalDonations = physicalDonations.slice(offset, offset + pageSize);
       } else if (campaignId) {
         physicalDonations = await physicalDonationService.getDonationsForCampaign(
           campaignId,
@@ -226,8 +312,12 @@ const UnifiedDonationHistory: React.FC<UnifiedDonationHistoryProps> = ({
         estimatedValue: donation.estimated_value,
         pickupPreference: (donation.pickup_preference as PickupPreference | undefined),
         donationItems: donation.donation_items,
-        coordinatorNotes: donation.coordinator_notes
-      }));
+        coordinatorNotes: donation.coordinator_notes,
+        // Add date fields for status tracking
+        preferredPickupDate: donation.preferred_pickup_date,
+        confirmedAt: donation.confirmed_at,
+        receivedAt: donation.received_at
+      } as UnifiedDonation & { preferredPickupDate?: string; confirmedAt?: string; receivedAt?: string }));
     } catch (error) {
       console.error('Error loading physical donations:', error);
       return [];
@@ -239,16 +329,29 @@ const UnifiedDonationHistory: React.FC<UnifiedDonationHistoryProps> = ({
     setError(null);
 
     try {
+      console.log('loadDonations called:', { page, resetList, organizationId });
+      
       // Load both cash and physical donations
       const [cashDonations, physicalDonations] = await Promise.all([
         loadCashDonations(page),
         loadPhysicalDonations(page)
       ]);
 
+      console.log('Loaded donations:', {
+        cash: cashDonations.length,
+        physical: physicalDonations.length,
+        physicalStatuses: physicalDonations.map(d => ({ id: d.id, status: d.status }))
+      });
+
       // Combine and sort donations
       const allDonations = [...cashDonations, ...physicalDonations];
       const sortedDonations = sortDonations(allDonations, sorting);
       const filteredDonations = filterDonations(sortedDonations, filters);
+
+      console.log('Filtered donations:', {
+        total: filteredDonations.length,
+        physicalStatuses: filteredDonations.filter(d => d.type === 'physical').map(d => ({ id: d.id, status: d.status }))
+      });
 
       if (resetList) {
         setDonations(filteredDonations);
@@ -264,7 +367,7 @@ const UnifiedDonationHistory: React.FC<UnifiedDonationHistoryProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [filters, sorting, pageSize, loadCashDonations, loadPhysicalDonations]);
+  }, [filters, sorting, pageSize, loadCashDonations, loadPhysicalDonations, organizationId]);
 
   const sortDonations = (donations: UnifiedDonation[], sort: DonationHistorySort): UnifiedDonation[] => {
     return [...donations].sort((a, b) => {
@@ -375,6 +478,102 @@ const UnifiedDonationHistory: React.FC<UnifiedDonationHistoryProps> = ({
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const handleStatusUpdate = async (donationId: string, newStatus: PhysicalDonationStatus, notes?: string) => {
+    console.log('handleStatusUpdate called:', { donationId, newStatus, notes });
+    setUpdatingStatus(donationId);
+    try {
+      const result = await physicalDonationService.updateDonationStatus(donationId, newStatus, notes);
+      console.log('Status update result:', result);
+      
+      if (result.success) {
+        toast({
+          title: 'Status Updated',
+          description: `Donation status has been updated to ${newStatus}.`,
+        });
+        
+        // Immediately update the donation in local state
+        setDonations(prevDonations => {
+          const updated = prevDonations.map(donation => {
+            if (donation.id === donationId) {
+              console.log('Updating donation in state:', { 
+                oldStatus: donation.status, 
+                newStatus,
+                donationId 
+              });
+              return {
+                ...donation,
+                status: newStatus
+              };
+            }
+            return donation;
+          });
+          console.log('Updated donations state:', updated.find(d => d.id === donationId));
+          return updated;
+        });
+        
+        // Reload the specific donation to get updated data including dates
+        try {
+          const updatedDonation = await physicalDonationService.getPhysicalDonationById(donationId);
+          console.log('Reloaded donation:', updatedDonation);
+          
+          if (updatedDonation) {
+            // Update the donation in local state with full updated data
+            setDonations(prevDonations => 
+              prevDonations.map(donation => 
+                donation.id === donationId 
+                  ? {
+                      ...donation,
+                      status: updatedDonation.donation_status as PhysicalDonationStatus,
+                      coordinatorNotes: updatedDonation.coordinator_notes,
+                      confirmedAt: updatedDonation.confirmed_at,
+                      receivedAt: updatedDonation.received_at,
+                      preferredPickupDate: updatedDonation.preferred_pickup_date
+                    } as UnifiedDonation & { 
+                      confirmedAt?: string; 
+                      receivedAt?: string;
+                      preferredPickupDate?: string;
+                    }
+                  : donation
+              )
+            );
+          }
+        } catch (reloadError) {
+          console.error('Error reloading donation:', reloadError);
+          // Continue even if reload fails - we already updated the status
+        }
+        
+        // Force a complete reload to get fresh data from database
+        // Use a small delay to ensure database has updated
+        await new Promise(resolve => setTimeout(resolve, 300));
+        await loadDonations(currentPage, true);
+      } else {
+        console.error('Status update failed:', result.error);
+        toast({
+          title: 'Error',
+          description: result.error || 'Failed to update donation status.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Exception in handleStatusUpdate:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update donation status.',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
+  const handleApprove = async (donationId: string) => {
+    await handleStatusUpdate(donationId, 'confirmed');
+  };
+
+  const handleReject = async (donationId: string) => {
+    await handleStatusUpdate(donationId, 'declined');
   };
 
   const getStatusColor = (status: string, type: DonationType): string => {
@@ -682,15 +881,96 @@ const UnifiedDonationHistory: React.FC<UnifiedDonationHistoryProps> = ({
                             </div>
                           </div>
                         )}
+
+                        {/* Status information for donors (show pickup/delivery dates) */}
+                        {donation.type === 'physical' && (userId || donorEmail) && (
+                          <div className="mt-2 space-y-1">
+                            {(donation as any).preferredPickupDate && (
+                              <div className="text-xs text-muted-foreground">
+                                <Calendar className="h-3 w-3 inline mr-1" />
+                                Preferred Pickup: {formatDate((donation as any).preferredPickupDate)}
+                              </div>
+                            )}
+                            {(donation as any).confirmedAt && (
+                              <div className="text-xs text-green-600">
+                                <CheckCircle className="h-3 w-3 inline mr-1" />
+                                Confirmed: {formatDate((donation as any).confirmedAt)}
+                              </div>
+                            )}
+                            {(donation as any).receivedAt && (
+                              <div className="text-xs text-green-700">
+                                <CheckCircle className="h-3 w-3 inline mr-1" />
+                                Received: {formatDate((donation as any).receivedAt)}
+                              </div>
+                            )}
+                            {donation.status === 'in_transit' && (
+                              <div className="text-xs text-blue-600">
+                                <Package className="h-3 w-3 inline mr-1" />
+                                In Transit
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" onClick={() => setSelectedDonation(donation)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
+                    <div className="flex items-center gap-2">
+                      {donation.type === 'physical' && organizationId && (
+                        <>
+                          {donation.status === 'pending' && (
+                            <>
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => handleApprove(donation.id)}
+                                disabled={updatingStatus === donation.id}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                {updatingStatus === donation.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  'Approve'
+                                )}
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleReject(donation.id)}
+                                disabled={updatingStatus === donation.id}
+                              >
+                                {updatingStatus === donation.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  'Reject'
+                                )}
+                              </Button>
+                            </>
+                          )}
+                          {/* Status update dropdown - only show for approved donations (not pending/declined/cancelled) */}
+                          {donation.status === 'confirmed' || donation.status === 'in_transit' || donation.status === 'received' ? (
+                            <Select
+                              value={donation.status}
+                              onValueChange={(value) => handleStatusUpdate(donation.id, value as PhysicalDonationStatus)}
+                              disabled={updatingStatus === donation.id}
+                            >
+                              <SelectTrigger className="w-40">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="confirmed">Confirmed</SelectItem>
+                                <SelectItem value="in_transit">In Transit</SelectItem>
+                                <SelectItem value="received">Received</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : null}
+                        </>
+                      )}
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" onClick={() => setSelectedDonation(donation)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
                       <DialogContent className="max-w-2xl">
                         <DialogHeader>
                           <DialogTitle>Donation Details</DialogTitle>
@@ -726,35 +1006,75 @@ const UnifiedDonationHistory: React.FC<UnifiedDonationHistoryProps> = ({
                                 </div>
                               )}
 
-                              {selectedDonation.type === 'physical' && selectedDonation.donationItems && (
-                                <div>
-                                  <Label className="text-sm font-medium">Items</Label>
-                                  <div className="space-y-2 mt-2">
-                                    {selectedDonation.donationItems.map((item, index) => (
-                                      <div key={index} className="border rounded p-2">
-                                        <div className="flex justify-between items-start">
-                                          <div>
-                                            <p className="font-medium">{item.item_name}</p>
-                                            <p className="text-sm text-muted-foreground">
-                                              {item.quantity} {item.unit} • {item.condition}
-                                            </p>
-                                          </div>
-                                          {item.estimated_value_per_unit && (
-                                            <Badge variant="outline">
-                                              {formatCurrency(item.quantity * item.estimated_value_per_unit)}
-                                            </Badge>
-                                          )}
-                                        </div>
+                              {selectedDonation.type === 'physical' && (
+                                <>
+                                  {/* Physical Donation Status Information */}
+                                  <div className="grid grid-cols-2 gap-4 border-t pt-4">
+                                    <div>
+                                      <Label className="text-sm font-medium">Pickup Preference</Label>
+                                      <p className="text-sm capitalize">{selectedDonation.pickupPreference || 'Not specified'}</p>
+                                    </div>
+                                    {selectedDonation.type === 'physical' && (selectedDonation as any).preferredPickupDate && (
+                                      <div>
+                                        <Label className="text-sm font-medium">Preferred Pickup Date</Label>
+                                        <p className="text-sm">{formatDate((selectedDonation as any).preferredPickupDate)}</p>
                                       </div>
-                                    ))}
+                                    )}
+                                    {(selectedDonation as any).confirmed_at && (
+                                      <div>
+                                        <Label className="text-sm font-medium">Confirmed At</Label>
+                                        <p className="text-sm">{formatDate((selectedDonation as any).confirmed_at)}</p>
+                                      </div>
+                                    )}
+                                    {(selectedDonation as any).received_at && (
+                                      <div>
+                                        <Label className="text-sm font-medium">Received At</Label>
+                                        <p className="text-sm">{formatDate((selectedDonation as any).received_at)}</p>
+                                      </div>
+                                    )}
                                   </div>
-                                </div>
+
+                                  {/* Coordinator Notes (for organizations) */}
+                                  {organizationId && (selectedDonation as any).coordinatorNotes && (
+                                    <div>
+                                      <Label className="text-sm font-medium">Coordinator Notes</Label>
+                                      <p className="text-sm text-muted-foreground">{(selectedDonation as any).coordinatorNotes}</p>
+                                    </div>
+                                  )}
+
+                                  {/* Donation Items */}
+                                  {selectedDonation.donationItems && selectedDonation.donationItems.length > 0 && (
+                                    <div>
+                                      <Label className="text-sm font-medium">Items</Label>
+                                      <div className="space-y-2 mt-2">
+                                        {selectedDonation.donationItems.map((item, index) => (
+                                          <div key={index} className="border rounded p-2">
+                                            <div className="flex justify-between items-start">
+                                              <div>
+                                                <p className="font-medium">{item.item_name}</p>
+                                                <p className="text-sm text-muted-foreground">
+                                                  {item.quantity} {item.unit} • {item.condition}
+                                                </p>
+                                              </div>
+                                              {item.estimated_value_per_unit && (
+                                                <Badge variant="outline">
+                                                  {formatCurrency(item.quantity * item.estimated_value_per_unit)}
+                                                </Badge>
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
                               )}
                             </>
                           )}
                         </div>
                       </DialogContent>
-                    </Dialog>
+                      </Dialog>
+                    </div>
                   </div>
                 </div>
               ))}
