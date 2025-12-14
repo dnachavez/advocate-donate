@@ -7,11 +7,14 @@ import {
   GraduationCap, 
   Heart, 
   Stethoscope, 
-  Shirt,
+  Droplets,
+  Baby,
+  Accessibility,
+  Leaf,
+  Building2,
   ArrowRight
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { campaignService } from "@/lib/campaignService";
 import { supabase } from "@/integrations/supabase/client";
 import foodImage from "@/assets/food-donations.jpg";
 
@@ -19,35 +22,13 @@ const CategoriesSection = () => {
   const [categories, setCategories] = useState([
     {
       icon: UtensilsCrossed,
-      name: "Food Security",
+      name: "Food & Nutrition",
       description: "Meals, groceries, and nutrition programs",
       activeCampaigns: 0,
       urgentNeeds: 0,
       totalRaised: 0,
       color: "text-orange-600",
       bgColor: "bg-orange-50",
-      image: foodImage
-    },
-    {
-      icon: Home,
-      name: "Shelter & Housing", 
-      description: "Emergency shelter, housing assistance",
-      activeCampaigns: 0,
-      urgentNeeds: 0,
-      totalRaised: 0,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
-      image: foodImage
-    },
-    {
-      icon: GraduationCap,
-      name: "Education",
-      description: "School supplies, scholarships, programs",
-      activeCampaigns: 0,
-      urgentNeeds: 0,
-      totalRaised: 0,
-      color: "text-green-600",
-      bgColor: "bg-green-50",
       image: foodImage
     },
     {
@@ -62,19 +43,19 @@ const CategoriesSection = () => {
       image: foodImage
     },
     {
-      icon: Shirt,
-      name: "Clothing & Essentials",
-      description: "Clothing, hygiene items, basics",
+      icon: GraduationCap,
+      name: "Education",
+      description: "School supplies, scholarships, programs",
       activeCampaigns: 0,
       urgentNeeds: 0,
       totalRaised: 0,
-      color: "text-purple-600",
-      bgColor: "bg-purple-50",
+      color: "text-green-600",
+      bgColor: "bg-green-50",
       image: foodImage
     },
     {
       icon: Heart,
-      name: "Emergency Relief",
+      name: "Disaster Relief",
       description: "Disaster response, crisis support",
       activeCampaigns: 0,
       urgentNeeds: 0,
@@ -82,49 +63,141 @@ const CategoriesSection = () => {
       color: "text-pink-600",
       bgColor: "bg-pink-50",
       image: foodImage
+    },
+    {
+      icon: Home,
+      name: "Housing & Shelter", 
+      description: "Emergency shelter, housing assistance",
+      activeCampaigns: 0,
+      urgentNeeds: 0,
+      totalRaised: 0,
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
+      image: foodImage
+    },
+    {
+      icon: Droplets,
+      name: "Clean Water",
+      description: "Safe drinking water and sanitation",
+      activeCampaigns: 0,
+      urgentNeeds: 0,
+      totalRaised: 0,
+      color: "text-cyan-600",
+      bgColor: "bg-cyan-50",
+      image: foodImage
+    },
+    {
+      icon: Baby,
+      name: "Children & Youth",
+      description: "Child welfare and youth empowerment",
+      activeCampaigns: 0,
+      urgentNeeds: 0,
+      totalRaised: 0,
+      color: "text-indigo-600",
+      bgColor: "bg-indigo-50",
+      image: foodImage
+    },
+    {
+      icon: Accessibility,
+      name: "Elderly Care",
+      description: "Support for senior citizens",
+      activeCampaigns: 0,
+      urgentNeeds: 0,
+      totalRaised: 0,
+      color: "text-teal-600",
+      bgColor: "bg-teal-50",
+      image: foodImage
+    },
+    {
+      icon: Leaf,
+      name: "Environment",
+      description: "Conservation and sustainability",
+      activeCampaigns: 0,
+      urgentNeeds: 0,
+      totalRaised: 0,
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50",
+      image: foodImage
+    },
+    {
+      icon: Building2,
+      name: "Community Development",
+      description: "Infrastructure and local projects",
+      activeCampaigns: 0,
+      urgentNeeds: 0,
+      totalRaised: 0,
+      color: "text-violet-600",
+      bgColor: "bg-violet-50",
+      image: foodImage
     }
   ]);
   const [loading, setLoading] = useState(true);
+
+  // Mapping between UI category names and possible Database category names
+  const CATEGORY_MAPPING: Record<string, string[]> = {
+    "Food & Nutrition": ["Food & Nutrition", "Food Security", "Hunger", "Food", "Nutrition"],
+    "Healthcare": ["Healthcare", "Health", "Medical"],
+    "Education": ["Education", "Schooling"],
+    "Disaster Relief": ["Disaster Relief", "Emergency Relief", "Emergency", "Crisis Response"],
+    "Housing & Shelter": ["Housing & Shelter", "Shelter & Housing", "Housing", "Shelter", "Homelessness"],
+    "Clean Water": ["Clean Water", "Water", "Sanitation", "WASH"],
+    "Children & Youth": ["Children & Youth", "Children", "Youth", "Kids"],
+    "Elderly Care": ["Elderly Care", "Seniors", "Elderly", "Aged Care"],
+    "Environment": ["Environment", "Nature", "Climate", "Sustainability"],
+    "Community Development": ["Community Development", "Community", "Development"]
+  };
 
   useEffect(() => {
     const fetchCategoryStats = async () => {
       try {
         setLoading(true);
         const categoryNames = [
-          "Food Security",
-          "Shelter & Housing", 
-          "Education",
+          "Food & Nutrition",
           "Healthcare",
-          "Clothing & Essentials",
-          "Emergency Relief"
+          "Education",
+          "Disaster Relief",
+          "Housing & Shelter",
+          "Clean Water",
+          "Children & Youth",
+          "Elderly Care",
+          "Environment",
+          "Community Development"
         ];
+
+        const now = new Date().toISOString();
 
         const categoryStats = await Promise.all(
           categoryNames.map(async (categoryName) => {
-            // Get campaigns count for category
-            const { totalCount: activeCampaigns } = await campaignService.getCampaigns(1, 0, categoryName);
+            const dbCategories = CATEGORY_MAPPING[categoryName] || [categoryName];
             
-            // Get urgent campaigns count
-            const { count: urgentCount } = await supabase
+            // Get active campaigns with their stats
+            const { data: campaigns, error } = await supabase
               .from('campaigns')
-              .select('*', { count: 'exact', head: true })
-              .eq('category', categoryName)
+              .select('goal_amount, raised_amount, is_urgent')
+              .in('category', dbCategories)
               .eq('status', 'active')
-              .eq('is_urgent', true);
+              .gt('end_date', now);
 
-            // Get total raised for category
-            const { data: campaignDonations } = await supabase
-              .from('donations')
-              .select('amount, campaigns!inner(category)')
-              .eq('campaigns.category', categoryName)
-              .eq('payment_status', 'succeeded');
+            if (error) {
+              console.error(`Error fetching stats for ${categoryName}:`, error);
+              return {
+                activeCampaigns: 0,
+                urgentNeeds: 0,
+                totalRaised: 0,
+                totalGoal: 0
+              };
+            }
 
-            const totalRaised = campaignDonations?.reduce((sum, d) => sum + d.amount, 0) || 0;
+            const activeCampaigns = campaigns.length;
+            const urgentNeeds = campaigns.filter(c => c.is_urgent).length;
+            const totalRaised = campaigns.reduce((sum, c) => sum + (c.raised_amount || 0), 0);
+            const totalGoal = campaigns.reduce((sum, c) => sum + (c.goal_amount || 0), 0);
 
             return {
-              activeCampaigns: activeCampaigns || 0,
-              urgentNeeds: urgentCount || 0,
-              totalRaised
+              activeCampaigns,
+              urgentNeeds,
+              totalRaised,
+              totalGoal
             };
           })
         );
@@ -134,7 +207,8 @@ const CategoriesSection = () => {
             ...category,
             activeCampaigns: categoryStats[index].activeCampaigns,
             urgentNeeds: categoryStats[index].urgentNeeds,
-            totalRaised: categoryStats[index].totalRaised
+            totalRaised: categoryStats[index].totalRaised,
+            totalGoal: categoryStats[index].totalGoal
           }))
         );
       } catch (error) {
@@ -146,6 +220,13 @@ const CategoriesSection = () => {
 
     fetchCategoryStats();
   }, []);
+
+  const formatAmount = (amount: number) => {
+    if (amount >= 1000) {
+      return `₱${(amount / 1000).toFixed(1)}K`;
+    }
+    return `₱${amount.toLocaleString()}`;
+  };
 
   return (
     <section className="py-20 bg-background">
@@ -205,14 +286,18 @@ const CategoriesSection = () => {
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Total Raised</span>
                     <span className="font-medium text-success">
-                      {loading ? '...' : `₱${(category.totalRaised / 1000).toFixed(0)}K`}
+                      {loading ? '...' : formatAmount(category.totalRaised)}
                     </span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-1.5">
                     <div 
                       className="bg-gradient-impact h-1.5 rounded-full transition-all duration-500"
                       style={{ 
-                        width: loading ? '20%' : `${Math.min((category.totalRaised / 100000) * 100, 100)}%` 
+                        width: loading 
+                          ? '20%' 
+                          : `${(category as any).totalGoal > 0 
+                              ? Math.min((category.totalRaised / (category as any).totalGoal) * 100, 100) 
+                              : 0}%` 
                       }}
                     ></div>
                   </div>
