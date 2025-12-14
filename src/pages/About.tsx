@@ -12,6 +12,7 @@ import {
   Globe,
   ArrowRight
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import heroImage from "@/assets/hero-community.jpg";
 
 const About = () => {
@@ -93,10 +94,12 @@ const About = () => {
                 ensuring that every contribution—whether cash or in-kind—reaches 
                 the people and causes that need it most.
               </p>
-              <Button variant="hero" size="lg">
-                Join Our Mission
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
+              <Link to="/auth">
+                <Button variant="hero" size="lg">
+                  Join Our Mission
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+              </Link>
             </div>
             <Card className="p-8 bg-gradient-card">
               <h3 className="text-2xl font-semibold text-foreground mb-6">

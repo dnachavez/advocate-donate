@@ -44,7 +44,6 @@ const CampaignDonationSettings: React.FC<CampaignDonationSettingsProps> = ({
   const [organizationSettings, setOrganizationSettings] = useState<OrganizationDonationSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showAdvanced, setShowAdvanced] = useState<boolean>(value.donation_types_override || true);
 
   const loadOrganizationSettings = useCallback(async () => {
     setLoading(true);
@@ -69,10 +68,6 @@ const CampaignDonationSettings: React.FC<CampaignDonationSettingsProps> = ({
   useEffect(() => {
     loadOrganizationSettings();
   }, [loadOrganizationSettings]);
-
-  useEffect(() => {
-    setShowAdvanced(value.donation_types_override || true);
-  }, [value.donation_types_override]);
 
   const handleSettingChange = (field: keyof CampaignDonationSettingsForm, newValue: boolean | string[] | string | undefined) => {
     const updatedSettings = {
@@ -170,20 +165,35 @@ const CampaignDonationSettings: React.FC<CampaignDonationSettingsProps> = ({
               <Switch
                 checked={value.donation_types_override}
                 onCheckedChange={(checked) => {
-                  handleSettingChange('donation_types_override', checked);
+                  // Create a new settings object starting with current values
+                  let newSettings: CampaignDonationSettingsForm = {
+                    ...value,
+                    donation_types_override: checked
+                  };
+
                   if (!checked) {
-                    // Reset override fields when disabling
-                    handleSettingChange('accepts_cash_donations', true);
-                    handleSettingChange('accepts_physical_donations', false);
-                    handleSettingChange('physical_donation_categories', []);
-                    handleSettingChange('physical_donation_instructions', '');
+                    // Reset to defaults when disabling override
+                    // We keep them explicit to match OrganizationDonationSettingsForm structure where possible
+                    newSettings = {
+                      ...newSettings,
+                      accepts_cash_donations: true,
+                      accepts_physical_donations: false,
+                      physical_donation_categories: [],
+                      physical_donation_instructions: ''
+                    };
                   } else if (organizationSettings) {
-                    // Initialize with org settings when enabling override
-                    handleSettingChange('accepts_cash_donations', organizationSettings.accepts_cash_donations);
-                    handleSettingChange('accepts_physical_donations', organizationSettings.accepts_physical_donations);
-                    handleSettingChange('physical_donation_categories', organizationSettings.physical_donation_categories || []);
-                    handleSettingChange('physical_donation_instructions', organizationSettings.physical_donation_instructions || '');
+                    // When enabling, try to copy organization settings
+                    // Use nullish coalescing to ensure we don't pass nulls if org settings are incomplete
+                    newSettings = {
+                      ...newSettings,
+                      accepts_cash_donations: organizationSettings.accepts_cash_donations ?? true,
+                      accepts_physical_donations: organizationSettings.accepts_physical_donations ?? false,
+                      physical_donation_categories: organizationSettings.physical_donation_categories || [],
+                      physical_donation_instructions: organizationSettings.physical_donation_instructions || ''
+                    };
                   }
+                  
+                  onChange(newSettings);
                 }}
               />
             </div>

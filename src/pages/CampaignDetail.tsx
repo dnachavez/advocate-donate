@@ -128,6 +128,7 @@ const CampaignDetail = () => {
   }
 
   const progress = (campaign.raised_amount / campaign.goal_amount) * 100;
+  const isExpired = campaign.end_date && new Date(campaign.end_date) < new Date();
   const daysLeft = campaign.end_date ? Math.max(0, Math.ceil((new Date(campaign.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : null;
   const campaignImageUrl = campaign.featured_image_url || campaignImage;
 
@@ -198,11 +199,17 @@ const CampaignDetail = () => {
 
             <div className="space-y-4">
               <Card className="p-6">
-                <Link to={`/campaigns/${campaign.slug}/donate`}>
-                  <Button variant="donate" className="w-full">
-                    <Heart className="w-4 h-4 mr-2" /> Donate to this Campaign
+                {isExpired ? (
+                  <Button variant="secondary" className="w-full" disabled>
+                    Campaign Ended
                   </Button>
-                </Link>
+                ) : (
+                  <Link to={`/campaigns/${campaign.slug}/donate`}>
+                    <Button variant="donate" className="w-full">
+                      <Heart className="w-4 h-4 mr-2" /> Donate to this Campaign
+                    </Button>
+                  </Link>
+                )}
                 {campaign.organization?.slug && (
                   <Link to={`/organizations/${campaign.organization.slug}`} className="block mt-4">
                     <Button variant="outline" className="w-full">View Organization</Button>

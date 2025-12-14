@@ -29,6 +29,7 @@ export const campaignService = {
           organization:organizations(*)
         `, { count: 'exact' })
         .eq('status', 'active')
+        .gt('end_date', new Date().toISOString())
         .order('created_at', { ascending: false });
 
       if (category) {

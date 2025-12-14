@@ -6,7 +6,6 @@ import {
   CreditCard, 
   Package, 
   CheckCircle,
-  Users,
   Target,
   Heart
 } from "lucide-react";
@@ -51,12 +50,6 @@ const HowItWorksSection = () => {
       title: "Organizations",
       description: "Create campaigns and manage donations efficiently",
       features: ["Create fundraising campaigns", "Post item needs", "Manage inventory", "Coordinate logistics"]
-    },
-    {
-      icon: Users,
-      title: "Recipients",
-      description: "Request assistance and coordinate with donors",
-      features: ["Submit assistance requests", "Get matched with donors", "Schedule pickups", "Provide feedback"]
     }
   ];
 
