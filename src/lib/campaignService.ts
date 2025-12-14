@@ -16,7 +16,7 @@ export const campaignService = {
   /**
    * Get all active campaigns
    */
-  async getCampaigns(limit = 20, offset = 0, category?: string): Promise<{
+  async getCampaigns(limit = 20, offset = 0, category?: string, search?: string): Promise<{
     data: CampaignWithOrganization[];
     error: string | null;
     totalCount: number;
@@ -34,6 +34,10 @@ export const campaignService = {
 
       if (category) {
         query = query.eq('category', category);
+      }
+
+      if (search) {
+        query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
       }
 
       const { data, error, count } = await query.range(offset, offset + limit - 1);
@@ -257,7 +261,7 @@ export const campaignService = {
         `)
         .eq('status', 'active')
         .eq('is_urgent', true)
-        .order('end_date', { ascending: true, nullsLast: true })
+        .order('end_date', { ascending: true, nullsFirst: false })
         .limit(limit);
 
       if (error) {

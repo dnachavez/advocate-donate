@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Menu, X, Heart, Search, User, LogOut, Settings, Award } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useNavigate } from "react-router-dom";
@@ -21,6 +22,15 @@ const Navigation = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const { user, isAuthenticated, signOut, loading } = useAuth();
   const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/campaigns?search=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery("");
+    }
+  };
 
   // Gamification hooks
   const { achievement, isLoading: achievementLoading } = useAchievement();
@@ -75,7 +85,17 @@ const Navigation = () => {
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center space-x-4">
-            <Button variant="ghost" size="icon">
+            <form onSubmit={handleSearch} className="relative hidden lg:block w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search campaigns..."
+                className="pl-9 h-9 w-full bg-background"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </form>
+            <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => navigate('/campaigns')}>
               <Search className="w-4 h-4" />
             </Button>
 

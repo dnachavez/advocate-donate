@@ -21,21 +21,41 @@ import {
   Loader2,
   AlertCircle
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { campaignService, CampaignWithOrganization } from "@/lib/campaignService";
 import campaignImage from "@/assets/food-donations.jpg";
 
 const Campaigns = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [campaigns, setCampaigns] = useState<CampaignWithOrganization[]>([]);
   const [featuredCampaigns, setFeaturedCampaigns] = useState<CampaignWithOrganization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [sortBy, setSortBy] = useState('Most Recent');
   const [totalCount, setTotalCount] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
+  
+  // Debounce search term
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+
+  // Update search term when URL param changes
+  useEffect(() => {
+    const query = searchParams.get('search');
+    if (query !== null) {
+      setSearchTerm(query);
+      setDebouncedSearchTerm(query);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Add error boundary protection
   const [hasError, setHasError] = useState(false);
@@ -69,7 +89,12 @@ const Campaigns = () => {
       }
 
       const offset = reset ? 0 : campaigns.length;
-      const { data, error: fetchError, totalCount: count } = await campaignService.getCampaigns(20, offset, selectedCategory !== 'All Categories' ? selectedCategory : undefined);
+      const { data, error: fetchError, totalCount: count } = await campaignService.getCampaigns(
+        20, 
+        offset, 
+        selectedCategory !== 'All Categories' ? selectedCategory : undefined,
+        debouncedSearchTerm
+      );
 
       if (fetchError) {
         setError(fetchError);
@@ -114,18 +139,9 @@ const Campaigns = () => {
       console.error('Error in useEffect:', error);
       setHasError(true);
     }
-  }, [selectedCategory]);
+  }, [selectedCategory, debouncedSearchTerm]);
 
-  const filteredCampaigns = campaigns.filter(campaign => {
-    const matchesSearch = !searchTerm ||
-      campaign.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      campaign.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      campaign.organization?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-
-    return matchesSearch;
-  });
-
-  const sortedCampaigns = [...filteredCampaigns].sort((a, b) => {
+  const sortedCampaigns = [...campaigns].sort((a, b) => {
     switch (sortBy) {
       case 'Ending Soon': {
         const daysLeftA = calculateDaysLeft(a.end_date) ?? Infinity;

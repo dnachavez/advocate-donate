@@ -38,7 +38,9 @@ import {
   DonationType,
   DonationStatus,
   PhysicalDonationStatus,
-  PickupPreference
+  PickupPreference,
+  PhysicalDonationWithItems,
+  DonationItem
 } from '../types/donations';
 
 interface UnifiedDonationHistoryProps {
@@ -183,25 +185,9 @@ const UnifiedDonationHistory: React.FC<UnifiedDonationHistoryProps> = ({
   }, [organizationId, campaignId, userId, donorEmail, pageSize]);
 
   // Load physical donations based on context
-  type MinimalPhysicalDonation = {
-    id: string;
-    donor_name: string;
-    donor_email: string;
-    message?: string;
-    target_type: string;
-    target_id?: string;
-    target_name: string;
-    created_at?: string;
-    donation_status: string;
-    estimated_value?: number;
-    pickup_preference?: string;
-    donation_items?: Array<{ item_name: string; quantity: number; unit: string; condition: string; estimated_value_per_unit?: number }>;
-    coordinator_notes?: string;
-  };
-
   const loadPhysicalDonations = useCallback(async (page: number): Promise<UnifiedDonation[]> => {
     try {
-      let physicalDonations: MinimalPhysicalDonation[] = [];
+      let physicalDonations: PhysicalDonationWithItems[] = [];
 
       if (organizationId) {
         physicalDonations = await physicalDonationService.getDonationsForOrganization(
@@ -239,7 +225,7 @@ const UnifiedDonationHistory: React.FC<UnifiedDonationHistoryProps> = ({
         status: donation.donation_status as PhysicalDonationStatus,
         estimatedValue: donation.estimated_value,
         pickupPreference: (donation.pickup_preference as PickupPreference | undefined),
-        // Omit donationItems to avoid type mismatch between service shape and DB Row type
+        donationItems: donation.donation_items,
         coordinatorNotes: donation.coordinator_notes
       }));
     } catch (error) {
