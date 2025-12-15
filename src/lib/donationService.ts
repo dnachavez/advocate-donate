@@ -60,6 +60,9 @@ export interface DonationHistory {
   payment_status: string;
   created_at: string;
   processed_at?: string;
+  is_anonymous?: boolean;
+  donor_name?: string;
+  donor_email?: string;
 }
 
 class DonationService {
@@ -598,6 +601,62 @@ class DonationService {
         donations: [],
         total: 0,
         error: 'An unexpected error occurred while loading donations.'
+      };
+    }
+  }
+
+  /**
+   * Get donations for a specific campaign
+   */
+  async getCampaignDonations(
+    campaignId: string,
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<{
+    donations: DonationHistory[];
+    total: number;
+    error?: string;
+  }> {
+    try {
+      // Check if user is authenticated
+      const isAuth = await isAuthenticated();
+      if (!isAuth) {
+        return {
+          donations: [],
+          total: 0,
+          error: 'You must be signed in to view donations.'
+        };
+      }
+
+      // Fetch donations with pagination using campaign_id
+      const { data: donations, error: donationsError, count } = await supabase
+        .from('donations')
+        .select('*', { count: 'exact' })
+        .eq('campaign_id', campaignId)
+        .eq('payment_status', 'succeeded')
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (donationsError) {
+        console.error('Error fetching campaign donations:', donationsError);
+        return {
+          donations: [],
+          total: 0,
+          error: 'Failed to load campaign donation history.'
+        };
+      }
+
+      return {
+        donations: donations || [],
+        total: count || 0,
+        error: undefined
+      };
+    } catch (error) {
+      console.error('Error in getCampaignDonations:', error);
+      return {
+        donations: [],
+        total: 0,
+        error: 'An unexpected error occurred while loading campaign donations.'
       };
     }
   }

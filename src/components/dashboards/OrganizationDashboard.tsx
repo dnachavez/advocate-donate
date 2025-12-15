@@ -32,6 +32,7 @@ import { physicalDonationService } from '@/lib/physicalDonationService';
 import UnifiedDonationHistory from '@/components/UnifiedDonationHistory';
 import OrganizationDonationSettings from '@/components/OrganizationDonationSettings';
 import { EvidenceUploadForm } from '@/components/evidence/EvidenceUploadForm';
+import { CampaignDonationHistory } from '@/components/dashboards/CampaignDonationHistory';
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { DonationStats } from '@/types/donations';
 
@@ -55,6 +56,12 @@ const OrganizationDashboard: React.FC = () => {
   });
   const [showDonationHistory, setShowDonationHistory] = useState(false);
   const [showDonationSettings, setShowDonationSettings] = useState(false);
+  
+  // State for campaign donation history dialog
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+  const [selectedCampaignTitle, setSelectedCampaignTitle] = useState<string>('');
+  const [showCampaignHistory, setShowCampaignHistory] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
 
@@ -64,6 +71,12 @@ const OrganizationDashboard: React.FC = () => {
       currency: currency.toUpperCase(),
       minimumFractionDigits: 2
     }).format(amount);
+  };
+
+  const handleShowCampaignHistory = (campaignId: string, campaignTitle: string) => {
+    setSelectedCampaignId(campaignId);
+    setSelectedCampaignTitle(campaignTitle);
+    setShowCampaignHistory(true);
   };
 
   const getJoinDate = () => {
@@ -428,7 +441,17 @@ const OrganizationDashboard: React.FC = () => {
                       {Math.round((campaign.raised_amount / campaign.goal_amount) * 100)}% funded
                     </p>
                   </div>
-                  <div className="ml-4">
+                  <div className="ml-4 flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex items-center gap-1"
+                      onClick={() => handleShowCampaignHistory(campaign.id, campaign.title)}
+                    >
+                      <DollarSign className="w-3 h-3" />
+                      History
+                    </Button>
+
                     <Dialog>
                       <DialogTrigger asChild>
                         <Button variant="outline" size="sm" className="flex items-center gap-1">
@@ -528,7 +551,17 @@ const OrganizationDashboard: React.FC = () => {
           </div>
         </CardContent>
       </Card>
-    </div >
+
+      {/* Campaign Donation History Dialog */}
+      {selectedCampaignId && (
+        <CampaignDonationHistory
+          campaignId={selectedCampaignId}
+          campaignTitle={selectedCampaignTitle}
+          open={showCampaignHistory}
+          onOpenChange={setShowCampaignHistory}
+        />
+      )}
+    </div>
   );
 };
 
